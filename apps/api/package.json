@@ -1,0 +1,32 @@
+{
+  "name": "@ai-code-reviewer-trpc/api",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "@ai-code-reviewer-trpc/database": "workspace:*",
+    "@ai-code-reviewer-trpc/trpc": "workspace:*",
+    "@ai-code-reviewer-trpc/utils": "workspace:*",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@trpc/server": "^11.18.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "inngest": "^4.6.0",
+    "octokit": "^5.0.5",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@ai-code-reviewer-trpc/utils",
+  "main": "index.js",
+  "private": true,
+
+  "exports" : {
+    "." : "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "echo 'utils package ready'",
+    "build": "tsc"
+  },
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

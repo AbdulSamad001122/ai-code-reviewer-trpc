@@ -1,0 +1,23 @@
+{
+  "name": "@ai-code-reviewer-trpc/trpc",
+  "private": true,
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "echo 'trpc package ready'"
+  },
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@ai-code-reviewer-trpc/database": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "inngest": "^4.6.0",
+    "octokit": "^5.0.5",
+    "zod": "^4.4.3"
+  }
+}

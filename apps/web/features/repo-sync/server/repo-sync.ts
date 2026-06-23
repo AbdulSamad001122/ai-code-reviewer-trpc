@@ -9,7 +9,7 @@ import { inngest } from "@/features/inngest/client";
 const MAX_FILE_SIZE_BYTES = 100_000;
 const MAX_FILES = 200;
 const MAX_CHUNK_LINES = 80;
-const UPSERT_BATCH_SIZE = 90;
+const UPSERT_BATCH_SIZE = 30;
 
 const CODE_EXTENSIONS = [
     ".ts", ".tsx", ".js", ".jsx", ".mjs", ".py", ".go", ".rb", ".rs",
@@ -138,6 +138,11 @@ export function buildRepoNamespace(repoFullName: string) {
       }));
   
       await index.namespace(namespace).upsertRecords({ records });
+
+      // Add a 5-second sleep to avoid hitting Pinecone serverless embedding token rate limits
+      if (start + UPSERT_BATCH_SIZE < validChunks.length) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
     }
   }
 

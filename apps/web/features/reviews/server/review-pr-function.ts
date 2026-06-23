@@ -65,6 +65,41 @@ export const reviewPullRequest = inngest.createFunction(
         return searchPrContext(repoNamespace, pullRequest.title);
       });
   
+      const prdContext = await step.run("fetch-prd-context", async () => {
+        if (!pullRequest.featureRequestId) {
+          return null;
+        }
+
+        const feature = await prisma.featureRequest.findUnique({
+          where: { id: pullRequest.featureRequestId },
+          include: {
+            prd: true,
+            project: {
+              include: {
+                tasks: true
+              }
+            }
+          }
+        });
+
+        if (!feature || !feature.prd) {
+          return null;
+        }
+
+        return {
+          prd: {
+            problemStatement: feature.prd.problemStatement,
+            goals: feature.prd.goals,
+            acceptanceCriteria: feature.prd.acceptanceCriteria,
+          },
+          tasks: feature.project.tasks.map(t => ({
+            title: t.title,
+            description: t.description,
+            status: t.status,
+          })),
+        };
+      });
+
       const review = await step.run("generate-ai-review", async () => {
         const contextSnippets = await searchPrContext(
           namespace,
@@ -76,6 +111,8 @@ export const reviewPullRequest = inngest.createFunction(
           title: pullRequest.title,
           contextSnippets,
           repoContextSnippets,
+          prd: prdContext?.prd ?? null,
+          tasks: prdContext?.tasks ?? null,
         });
       });
   
@@ -88,18 +125,48 @@ export const reviewPullRequest = inngest.createFunction(
         );
       });
   
-      await step.run("mark-reviewed", async () => {
+      const resultStatus = await step.run("mark-reviewed", async () => {
+        const isBlocking = review.includes("REQUEST CHANGES") || review.includes("[BLOCKING]");
+        const prStatus = isBlocking ? "fix_needed" : "reviewed";
+
         await prisma.pullRequest.update({
           where: { id: pullRequestId },
           data: {
-            status: "reviewed",
+            status: prStatus,
             reviewComment: review,
             reviewedAt: new Date(),
           },
         });
+
+        if (pullRequest.featureRequestId) {
+          if (isBlocking) {
+            await prisma.featureRequestChat.create({
+              data: {
+                featureRequestId: pullRequest.featureRequestId,
+                sender: "ai",
+                message: `I reviewed your pull request **#${pullRequest.prNumber}** and found some blocking issues. Please check the review comments on GitHub to resolve them. I've set the PR status to **Fix Needed**.`,
+              },
+            });
+          } else {
+            await prisma.featureRequest.update({
+              where: { id: pullRequest.featureRequestId },
+              data: { status: "ready_for_review" },
+            });
+
+            await prisma.featureRequestChat.create({
+              data: {
+                featureRequestId: pullRequest.featureRequestId,
+                sender: "ai",
+                message: `Great news! I reviewed pull request **#${pullRequest.prNumber}** and it successfully implements all PRD goals and acceptance criteria. The feature request is now **ready for review** and release approval!`,
+              },
+            });
+          }
+        }
+
+        return prStatus;
       });
   
-      return { pullRequestId, status: "reviewed" };
+      return { pullRequestId, status: resultStatus };
     }
   );
   

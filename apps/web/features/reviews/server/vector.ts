@@ -18,13 +18,24 @@ export async function saveChunksToPinecone(
         return;
     }
 
-    const records = validChunks.map((chunk) => ({
-        id: chunk.id,
-        text: chunk.text,
-        filePath: chunk.filePath,
-    }));
+    const BATCH_SIZE = 30;
 
-    await index.namespace(namespace).upsertRecords({ records });
+    for (let start = 0; start < validChunks.length; start += BATCH_SIZE) {
+        const batch = validChunks.slice(start, start + BATCH_SIZE);
+
+        const records = batch.map((chunk) => ({
+            id: chunk.id,
+            text: chunk.text,
+            filePath: chunk.filePath,
+        }));
+
+        await index.namespace(namespace).upsertRecords({ records });
+
+        // Add a 5-second sleep to avoid hitting Pinecone serverless embedding token rate limits
+        if (start + BATCH_SIZE < validChunks.length) {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+        }
+    }
 }
 
 

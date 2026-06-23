@@ -13,8 +13,9 @@ export type PullRequestWebhookPayload = {
       number: number;
       title: string;
       user: { login: string } | null;
-      head: { sha: string };
+      head: { sha: string; ref: string };
       base: { ref: string };
+      body: string | null;
     };
   };
 

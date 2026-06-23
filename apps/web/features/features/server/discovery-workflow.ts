@@ -276,8 +276,8 @@ ${codebaseSnippets.join("\n\n")}`;
     });
 
     // Save PRD in database and advance state to planning
-    await step.run("save-prd-and-advance", async () => {
-      await prisma.pRD.create({
+    const prd = await step.run("save-prd-and-advance", async () => {
+      const prdObj = await prisma.pRD.create({
         data: {
           featureRequestId,
           problemStatement: prdData.problemStatement,
@@ -300,12 +300,78 @@ ${codebaseSnippets.join("\n\n")}`;
         data: {
           featureRequestId,
           sender: "ai",
-          message: "PRD has been generated successfully! Head over to the PRD tab to review the specifications.",
+          message: "PRD has been generated successfully! Head over to the PRD tab to review the specifications. I have also auto-generated engineering tasks on your Kanban board.",
         },
       });
+
+      return prdObj;
     });
 
-    return { status: "planning", reason: "PRD generated successfully" };
+    // Generate engineering tasks from the compiled PRD
+    const tasks = await step.run("generate-engineering-tasks", async () => {
+      const systemPrompt = `You are a Technical Lead. Your task is to break down a Product Requirements Document (PRD) into a list of actionable, technical engineering tasks.
+You must reply ONLY with a JSON array in this format:
+[
+  {
+    "title": "string",
+    "description": "string"
+  }
+]
+Do not include any other text outside the JSON array.`;
+
+      const userPrompt = `Feature: ${featureRequest.title}
+Problem Statement: ${prdData.problemStatement}
+Goals: ${prdData.goals.join(", ")}
+Acceptance Criteria:
+${prdData.acceptanceCriteria.map((ac) => `- ${ac}`).join("\n")}
+
+Break this down into 3-6 clear, actionable development tasks (e.g. backend api creation, frontend ui card implementation, integration steps).`;
+
+      const { text } = await generateText({
+        model: openrouter(MODEL_NAME),
+        system: systemPrompt,
+        prompt: userPrompt,
+      });
+
+      try {
+        const start = text.indexOf("[");
+        const end = text.lastIndexOf("]");
+        if (start === -1 || end === -1) {
+          throw new Error("No JSON array found in response");
+        }
+        const jsonStr = text.substring(start, end + 1);
+        return JSON.parse(jsonStr) as { title: string; description: string }[];
+      } catch (error) {
+        console.error("Failed to parse tasks list. Raw response was:", text);
+        return [
+          {
+            title: `Implement ${featureRequest.title} Core Logic`,
+            description: "Build the core components, schemas, and routes matching the PRD specification.",
+          },
+          {
+            title: `Build Frontend Interface for ${featureRequest.title}`,
+            description: "Implement user-facing views, forms, and validation states.",
+          },
+        ];
+      }
+    });
+
+    // Save generated tasks in the database under 'todo' column
+    await step.run("save-engineering-tasks", async () => {
+      const tasksToCreate = tasks.map((task) => ({
+        projectId: featureRequest.projectId,
+        prdId: prd.id,
+        title: task.title,
+        description: task.description,
+        status: "todo",
+      }));
+
+      for (const t of tasksToCreate) {
+        await prisma.task.create({ data: t });
+      }
+    });
+
+    return { status: "planning", reason: "PRD and tasks generated successfully" };
   }
 );
 

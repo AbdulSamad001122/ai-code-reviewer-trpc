@@ -4,6 +4,7 @@ import { repoSyncRouter } from "./routers/repoSync.js";
 import { workspaceRouter } from "./routers/workspace.js";
 import { projectRouter } from "./routers/project.js";
 import { featuresRouter } from "./routers/features.js";
+import { tasksRouter } from "./routers/tasks.js";
 
 export const appRouter = router({
     health: publicProcedure.query(() => {
@@ -16,6 +17,7 @@ export const appRouter = router({
     workspace: workspaceRouter,
     project: projectRouter,
     features: featuresRouter,
+    tasks: tasksRouter,
 });
 
 export type AppRouter = typeof appRouter;

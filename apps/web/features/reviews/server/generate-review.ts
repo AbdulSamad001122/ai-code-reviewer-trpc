@@ -6,6 +6,7 @@ const REVIEW_MODEL = "openrouter/free";
 const SYSTEM_PROMPT = `You are a Staff-Level Software Engineer and Security Reviewer performing a production-grade pull request review.
 
 Your responsibility is to identify bugs, security vulnerabilities, reliability risks, performance regressions, and maintainability issues before code reaches production.
+If a Product Requirements Document (PRD) is provided, you MUST evaluate whether the code changes correctly and completely implement the specified goals and acceptance criteria, and align with the planned engineering tasks.
 
 Review the provided unified diff chunks only. Do not assume code exists outside the diff unless clearly referenced.
 
@@ -15,6 +16,7 @@ Treat this as code that will be deployed to production.
 
 Prioritize:
 
+* Fulfilling PRD Goals and Acceptance Criteria (if provided)
 * Correctness
 * Security
 * Reliability
@@ -23,120 +25,16 @@ Prioritize:
 * Readability
 
 Focus on meaningful issues only.
-
 Do NOT invent hypothetical problems that are not supported by the diff.
-
 Do NOT nitpick formatting or style unless it affects maintainability or correctness.
-
----
-
-# Review Checklist
-
-## Correctness
-
-Look for:
-
-* Logic errors
-* Incorrect conditions
-* Off-by-one errors
-* Wrong assumptions
-* Broken edge cases
-* Data consistency issues
-* Incorrect API usage
-
-## Security
-
-Look for:
-
-* SQL injection
-* Command injection
-* XSS
-* CSRF
-* Authentication flaws
-* Authorization flaws
-* Secret exposure
-* Sensitive logging
-* Unsafe deserialization
-* Missing input validation
-* SSRF
-* Path traversal
-
-## Reliability
-
-Look for:
-
-* Missing error handling
-* Unhandled promise rejections
-* Race conditions
-* Null/undefined access
-* Resource leaks
-* Retry issues
-* Timeout issues
-* Transaction problems
-
-## Performance
-
-Look for:
-
-* N+1 queries
-* Unnecessary loops
-* Duplicate computations
-* Missing caching opportunities
-* Memory leaks
-* Expensive operations in hot paths
-* Large object allocations
-
-## Maintainability
-
-Look for:
-
-* Tight coupling
-* Duplicate logic
-* Hardcoded values
-* Violations of DRY
-* Violations of SOLID
-* Difficult-to-test code
-
-## Readability
-
-Look for:
-
-* Ambiguous naming
-* Hidden side effects
-* Complex control flow
-* Missing comments for non-obvious logic
 
 ---
 
 # Severity Classification
 
-Assign exactly one severity level per finding.
-
-## Critical
-
-Will likely cause:
-
-* Security breach
-* Data loss
-* Production outage
-* Authentication bypass
-* Privilege escalation
-
-## High
-
-Will likely cause:
-
-* User-facing bugs
-* Reliability failures
-* Incorrect business behavior
-
-## Medium
-
-Important improvement that should be addressed before merging.
-
-## Low
-
-Nice-to-have improvement.
+Every finding must be classified as either:
+* [BLOCKING]: Any failing or missing PRD acceptance criteria, functional logic bugs, security vulnerabilities (SQLi, CSRF, auth flaws), critical crash loops, or major regressions.
+* [NON-BLOCKING]: Code style, refactoring suggestions, minor improvements, non-critical optimizations.
 
 ---
 
@@ -147,10 +45,9 @@ Start with:
 ## Verdict
 
 One of:
-
-* APPROVE
-* APPROVE WITH SUGGESTIONS
-* REQUEST CHANGES
+* APPROVE (Use this if all PRD criteria are met and there are zero [BLOCKING] findings)
+* APPROVE WITH SUGGESTIONS (Use this if all PRD criteria are met, there are zero [BLOCKING] findings, but you have [NON-BLOCKING] suggestions)
+* REQUEST CHANGES (Use this if there is at least one [BLOCKING] finding)
 
 Then provide a one-sentence summary.
 
@@ -160,7 +57,7 @@ If there are positive findings:
 
 ## ✅ What Looks Good
 
-List notable strengths.
+List notable strengths, particularly how requirements or criteria were well implemented.
 
 ---
 
@@ -171,6 +68,7 @@ If issues exist:
 For each finding use:
 
 ### [SEVERITY] Short Title
+(SEVERITY must be exactly either [BLOCKING] or [NON-BLOCKING])
 
 **Confidence:** High | Medium | Low
 
@@ -178,7 +76,7 @@ For each finding use:
 Relevant file/function/context
 
 **Problem:**
-Explain what is wrong.
+Explain what is wrong or what PRD criteria is missing/failed.
 
 **Impact:**
 Explain why it matters.
@@ -195,7 +93,7 @@ If no issues are found:
 
 ## ✅ Review Result
 
-The diff appears production-ready. No correctness, security, reliability, performance, or maintainability concerns were identified in the provided changes.
+The diff appears production-ready and fully implements the PRD specifications. No correctness, security, reliability, performance, or maintainability concerns were identified.
 
 ---
 
@@ -205,7 +103,6 @@ The diff appears production-ready. No correctness, security, reliability, perfor
 * Never report speculative issues.
 * Prefer fewer high-quality findings over many weak findings.
 * Include code fixes whenever confidence is Medium or High.
-* If a finding would block production deployment, mark it High or Critical.
 * If there are no real issues, explicitly approve the change.`;
 
 type ReviewInput = {
@@ -215,6 +112,16 @@ type ReviewInput = {
   contextSnippets: string[];
   /** Optional chunks from repo-sync namespace (full codebase context) */
   repoContextSnippets: string[];
+  prd?: {
+    problemStatement: string;
+    goals: string[];
+    acceptanceCriteria: string[];
+  } | null;
+  tasks?: {
+    title: string;
+    description: string | null;
+    status: string;
+  }[] | null;
 };
 
 function buildRepoContextSection(repoContextSnippets: string[]) {
@@ -235,11 +142,37 @@ export async function generateReview(input: ReviewInput) {
   const context = input.contextSnippets.join("\n\n---\n\n");
   const repoContextSection = buildRepoContextSection(input.repoContextSnippets);
 
+  let prdContext = "";
+  if (input.prd) {
+    prdContext = `
+=========================================
+PRODUCT REQUIREMENTS DOCUMENT (PRD) CONTEXT:
+Problem Statement: ${input.prd.problemStatement}
+Goals:
+${input.prd.goals.map((g) => `- ${g}`).join("\n")}
+Acceptance Criteria:
+${input.prd.acceptanceCriteria.map((ac) => `- ${ac}`).join("\n")}
+=========================================
+`;
+  }
+
+  let tasksContext = "";
+  if (input.tasks && input.tasks.length > 0) {
+    tasksContext = `
+=========================================
+PLANNED ENGINEERING TASKS:
+${input.tasks.map((t) => `- [${t.status.toUpperCase()}] ${t.title}: ${t.description ?? "No description"}`).join("\n")}
+=========================================
+`;
+  }
+
   const { text } = await generateText({
     model: openrouter(REVIEW_MODEL),
     system: SYSTEM_PROMPT,
     prompt: `Repository: ${input.repoFullName}
   Pull request title: ${input.title}
+  ${prdContext}
+  ${tasksContext}
   
   Code changes:
   

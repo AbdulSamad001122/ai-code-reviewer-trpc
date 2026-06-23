@@ -34,6 +34,7 @@ export const featuresRouter = router({
 
       const features = await prisma.featureRequest.findMany({
         where: { projectId: input.projectId },
+        include: { prd: true },
         orderBy: { createdAt: "desc" },
       });
 

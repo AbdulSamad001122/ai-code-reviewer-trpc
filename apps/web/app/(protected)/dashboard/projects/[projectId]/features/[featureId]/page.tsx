@@ -4,6 +4,7 @@ import { use, useState, useEffect, useRef } from "react";
 import { trpc } from "@/trpc/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -21,7 +22,6 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Spinner } from "@/components/ui/spinner";
 
-// A robust custom Markdown renderer styled with Tailwind to avoid external npm compilation locks
 function MarkdownRenderer({ content }: { content: string }) {
   if (!content) return null;
 
@@ -32,7 +32,6 @@ function MarkdownRenderer({ content }: { content: string }) {
       {lines.map((line, idx) => {
         const trimmed = line.trim();
 
-        // Headers
         if (trimmed.startsWith("# ")) {
           return (
             <h1 key={idx} className="text-2xl font-bold border-b border-border pb-2 pt-4 text-foreground">
@@ -55,7 +54,6 @@ function MarkdownRenderer({ content }: { content: string }) {
           );
         }
 
-        // Bullet lists
         if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
           return (
             <li key={idx} className="ml-6 list-disc text-muted-foreground pl-1">
@@ -64,7 +62,6 @@ function MarkdownRenderer({ content }: { content: string }) {
           );
         }
 
-        // Blockquotes
         if (trimmed.startsWith("> ")) {
           return (
             <blockquote key={idx} className="border-l-4 border-primary/50 bg-accent/40 pl-4 py-2 my-2 rounded-r-md italic text-muted-foreground">
@@ -73,17 +70,14 @@ function MarkdownRenderer({ content }: { content: string }) {
           );
         }
 
-        // Horizontal rules
         if (trimmed === "---") {
           return <hr key={idx} className="my-6 border-border" />;
         }
 
-        // Empty lines
         if (!trimmed) {
           return <div key={idx} className="h-2" />;
         }
 
-        // Bold formatting parse helper
         let htmlContent = line;
         const boldRegex = /\*\*(.*?)\*\*/g;
         htmlContent = htmlContent.replace(boldRegex, "<strong>$1</strong>");
@@ -109,8 +103,28 @@ export default function FeatureDetailPage({
   const [activeTab, setActiveTab] = useState("chat");
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Query feature details
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+    }
+  }, [message]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!message.trim() || sendMessageMutation.isPending) {
+        return;
+      }
+      sendMessageMutation.mutate({
+        featureId,
+        message,
+      });
+    }
+  };
+
   const {
     data: feature,
     isLoading: isLoadingFeature,
@@ -118,7 +132,6 @@ export default function FeatureDetailPage({
   } = trpc.features.get.useQuery(
     { featureId },
     {
-      // Poll details during PRD generation to advance views automatically
       refetchInterval: (query) => {
         const status = query.state.data?.status;
         return status === "discovery" || status === "prd_generation" ? 3500 : false;
@@ -126,12 +139,10 @@ export default function FeatureDetailPage({
     }
   );
 
-  // Query requirement chat history
   const { data: chats = [], refetch: refetchChats } = trpc.features.getChat.useQuery(
     { featureId },
     {
       refetchInterval: (query) => {
-        // Poll messages when waiting for AI replies during discovery
         return feature?.status === "discovery" ? 3500 : false;
       },
     }
@@ -156,12 +167,10 @@ export default function FeatureDetailPage({
     });
   };
 
-  // Scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chats]);
 
-  // Adjust active tab based on status load
   useEffect(() => {
     if (feature && feature.status !== "discovery" && feature.status !== "prd_generation") {
       setActiveTab("prd");
@@ -187,10 +196,10 @@ export default function FeatureDetailPage({
   const isDiscovery = feature.status === "discovery";
   const isPrdGenerating = feature.status === "prd_generation";
   const prdGenerated = feature.status !== "discovery" && feature.status !== "prd_generation";
+  const isAiTyping = chats.length > 0 && chats[chats.length - 1].sender === "user" && isDiscovery;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      {/* Header */}
       <div className="flex flex-col gap-2">
         <Link
           href={`/dashboard/projects/${projectId}/features`}
@@ -243,7 +252,6 @@ export default function FeatureDetailPage({
         </Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-3 flex-1 min-h-[500px]">
-          {/* Main workspace (Left Panel on desktop) */}
           <div className="lg:col-span-2 flex flex-col gap-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1">
               <TabsList className="border-b border-border bg-transparent w-full justify-start rounded-none h-9 p-0 gap-4">
@@ -265,7 +273,6 @@ export default function FeatureDetailPage({
                 </TabsTrigger>
               </TabsList>
 
-              {/* PRD Specifications Tab */}
               {prdGenerated && (
                 <TabsContent value="prd" className="flex-1 mt-6">
                   <Card className="border-border bg-card shadow-sm h-full">
@@ -294,11 +301,9 @@ export default function FeatureDetailPage({
                 </TabsContent>
               )}
 
-              {/* Discovery Chat Tab */}
               <TabsContent value="chat" className="flex-1 mt-6 flex flex-col min-h-[400px] max-h-[600px]">
                 <Card className="border-border bg-card flex flex-col flex-1 shadow-sm overflow-hidden h-full">
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[450px]">
-                    {/* Welcome request card */}
                     <div className="flex gap-3 max-w-[85%]">
                       <div className="flex size-7 shrink-0 select-none items-center justify-center rounded-full bg-accent text-accent-foreground font-bold text-xs">
                         U
@@ -311,7 +316,6 @@ export default function FeatureDetailPage({
                       </div>
                     </div>
 
-                    {/* Chat Logs */}
                     {chats.map((chat) => (
                       <div
                         key={chat.id}
@@ -339,20 +343,37 @@ export default function FeatureDetailPage({
                         </div>
                       </div>
                     ))}
+                    {(isAiTyping || sendMessageMutation.isPending) && (
+                      <div className="flex gap-3 max-w-[85%]">
+                        <div className="flex size-7 shrink-0 select-none items-center justify-center rounded-full bg-accent text-accent-foreground font-bold text-xs">
+                          AI
+                        </div>
+                        <div className="rounded-lg px-3.5 py-2.5 text-sm leading-relaxed bg-accent/40 border border-border/50 text-foreground flex items-center gap-1.5 shadow-sm">
+                          <span className="text-muted-foreground italic text-xs">AI PM is thinking</span>
+                          <span className="flex gap-1 items-center h-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.3s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.15s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" />
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     <div ref={messagesEndRef} />
                   </div>
 
-                  {/* Chat Input */}
                   {isDiscovery && (
                     <div className="border-t border-border p-4 bg-muted/10">
-                      <form onSubmit={handleSendMessage} className="flex gap-2">
-                        <Input
+                      <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
+                        <Textarea
+                          ref={textareaRef}
                           placeholder="Type your response to clarify details…"
                           value={message}
                           onChange={(e) => setMessage(e.target.value)}
+                          onKeyDown={handleKeyDown}
                           disabled={sendMessageMutation.isPending}
                           required
-                          className="border-border bg-background focus-visible:ring-primary flex-1"
+                          rows={1}
+                          className="border-border bg-background focus-visible:ring-primary flex-1 min-h-[40px] max-h-[160px] py-2 px-3 resize-none rounded-xl align-bottom"
                         />
                         <Button
                           type="submit"
@@ -374,7 +395,6 @@ export default function FeatureDetailPage({
             </Tabs>
           </div>
 
-          {/* Sidebar Project Details (Right Panel on desktop) */}
           <div className="space-y-6">
             <Card className="border-border bg-card shadow-sm">
               <CardHeader className="py-4 border-b border-border/50">

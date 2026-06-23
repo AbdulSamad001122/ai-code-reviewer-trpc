@@ -30,7 +30,6 @@ type PrdResponse = {
   markdown: string;
 };
 
-// Helper function to robustly generate and parse JSON responses from any LLM
 async function generateJson<T>(systemPrompt: string, userPrompt: string): Promise<T> {
   const { text } = await generateText({
     model: openrouter(MODEL_NAME),
@@ -52,7 +51,7 @@ async function generateJson<T>(systemPrompt: string, userPrompt: string): Promis
   }
 }
 
-// 1. Triggered when a new feature request is created
+// Triggered on new feature request
 export const onFeatureCreatedFunction = inngest.createFunction(
   {
     id: "on-feature-created",
@@ -61,7 +60,7 @@ export const onFeatureCreatedFunction = inngest.createFunction(
   async ({ event, step }) => {
     const { featureRequestId, projectId } = event.data;
 
-    // Fetch details of feature request
+    // Get feature details
     const featureRequest = await step.run("fetch-feature-details", async () => {
       const feat = await prisma.featureRequest.findUnique({
         where: { id: featureRequestId },
@@ -71,7 +70,7 @@ export const onFeatureCreatedFunction = inngest.createFunction(
       return feat;
     });
 
-    // Run similarity search on Pinecone to see if the feature already exists
+    // Check codebase for existing feature
     const codebaseSnippets = await step.run("search-codebase-vectors", async () => {
       const repoSync = await prisma.repoSync.findUnique({
         where: { repoFullName: featureRequest.project.repoFullName },
@@ -112,7 +111,6 @@ ${codebaseSnippets.join("\n\n")}`;
     }
 
     if (featureExists) {
-      // Feature exists: Close discovery and log ending message
       await step.run("mark-as-shipped", async () => {
         await prisma.featureRequestChat.create({
           data: {
@@ -131,7 +129,7 @@ ${codebaseSnippets.join("\n\n")}`;
       return { status: "shipped", reason: "Feature already exists in codebase" };
     }
 
-    // Feature does not exist: Ask first clarifying question
+    // Generate first question
     const firstQuestion = await step.run("generate-first-question", async () => {
       const systemPrompt = `You are an expert Product Manager. A user has submitted a feature request that is not yet in the codebase. Ask the first, highly targeted question to clarify missing requirements and details. Keep it conversational and friendly.
 Ask for exactly 1-2 major clarifications only (e.g. key user options, integration targets).`;
@@ -148,6 +146,7 @@ Description: ${featureRequest.description}`;
       return text;
     });
 
+    // Save question to chat
     await step.run("save-first-question", async () => {
       await prisma.featureRequestChat.create({
         data: {
@@ -162,7 +161,7 @@ Description: ${featureRequest.description}`;
   }
 );
 
-// 2. Triggered when the user responds to the AI chat
+// Triggered on feature chat response
 export const onFeatureChatReceivedFunction = inngest.createFunction(
   {
     id: "on-feature-chat-received",
@@ -171,7 +170,7 @@ export const onFeatureChatReceivedFunction = inngest.createFunction(
   async ({ event, step }) => {
     const { featureRequestId } = event.data;
 
-    // Fetch feature request and all chat logs
+    // Get chat logs
     const { featureRequest, chatLogs } = await step.run("fetch-chat-context", async () => {
       const feat = await prisma.featureRequest.findUnique({
         where: { id: featureRequestId },
@@ -191,7 +190,7 @@ export const onFeatureChatReceivedFunction = inngest.createFunction(
       return { featureRequest: feat, chatLogs: formattedLogs };
     });
 
-    // Check if we have enough info to write a PRD
+    // Verify requirements
     const checkResult = await step.run("check-requirements-sufficiency", async () => {
       const systemPrompt = `You are a Senior Product Manager. Your task is to analyze a feature request and the requirements discussion history, and decide if you have enough clear, detailed information to compile a structured Product Requirements Document (PRD).
 You must reply ONLY with a JSON object in this format:
@@ -227,7 +226,7 @@ Does this give you enough detail to write the PRD? If not, what is the next sing
       return { status: "discovery", reason: "Asked next question" };
     }
 
-    // Requirements are sufficient: Transition to PRD Generation
+    // Update status to generating
     await step.run("update-status-generating", async () => {
       await prisma.featureRequest.update({
         where: { id: featureRequestId },
@@ -243,13 +242,13 @@ Does this give you enough detail to write the PRD? If not, what is the next sing
       });
     });
 
-    // Query Pinecone context again to enrich PRD writing
+    // Search codebase
     const codebaseSnippets = await step.run("search-codebase-for-prd", async () => {
       const repoNamespace = buildRepoNamespace(featureRequest.project.repoFullName);
       return searchPrContext(repoNamespace, `${featureRequest.title} ${featureRequest.description}`);
     });
 
-    // Compile PRD using AI
+    // Compile PRD
     const prdData = await step.run("compile-prd", async () => {
       const systemPrompt = `You are a Senior Product Manager. Your task is to generate a comprehensive Product Requirements Document (PRD) for the requested feature based on the requirements chat logs and the repository codebase context.
 You must reply ONLY with a JSON object in this format:
@@ -275,7 +274,7 @@ ${codebaseSnippets.join("\n\n")}`;
       return generateJson<PrdResponse>(systemPrompt, userPrompt);
     });
 
-    // Save PRD in database and advance state to planning
+    // Save PRD
     const prd = await step.run("save-prd-and-advance", async () => {
       const prdObj = await prisma.pRD.create({
         data: {
@@ -307,7 +306,7 @@ ${codebaseSnippets.join("\n\n")}`;
       return prdObj;
     });
 
-    // Generate engineering tasks from the compiled PRD
+    // Generate board tasks
     const tasks = await step.run("generate-engineering-tasks", async () => {
       const systemPrompt = `You are a Technical Lead. Your task is to break down a Product Requirements Document (PRD) into a list of actionable, technical engineering tasks.
 You must reply ONLY with a JSON array in this format:
@@ -356,7 +355,7 @@ Break this down into 3-6 clear, actionable development tasks (e.g. backend api c
       }
     });
 
-    // Save generated tasks in the database under 'todo' column
+    // Save engineering tasks
     await step.run("save-engineering-tasks", async () => {
       const tasksToCreate = tasks.map((task) => ({
         projectId: featureRequest.projectId,

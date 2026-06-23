@@ -112,6 +112,25 @@ Provide a brief summary statement of the review findings.
 
 ---
 
+## ⚙️ Kanban Task Transitions
+
+At the very end of your review output, you MUST include a structured JSON block updating the status of the planned engineering tasks based on the code changes:
+- Evaluate each task ID provided in the PLANNED ENGINEERING TASKS section against the code changes.
+- Transition status to "review" if the task's implementation is fully complete in the diff.
+- Transition status to "in_progress" if code changes implementing the task have started but are not yet complete.
+- Keep status as "todo" if no code has been written for the task yet.
+- CRITICAL GUARDRAIL: Never set a task status to "done" or "completed". Only "in_progress", "review", or "todo" are allowed.
+- Output this block enclosed in [TASK_UPDATES] and [/TASK_UPDATES] tags.
+- Example:
+[TASK_UPDATES]
+{
+  "cmqqllxoo0000k03s5ltusb8r": "review",
+  "cmqqllxoo0001k03s5ltusb8r": "in_progress"
+}
+[/TASK_UPDATES]
+
+---
+
 # Important Rules
 
 * Reference actual code context from the diff.
@@ -124,9 +143,7 @@ type ReviewInput = {
   repoFullName: string;
   title: string;
   isLinkedToFeature: boolean;
-  /** Chunks retrieved from the PR's Pinecone namespace */
   contextSnippets: string[];
-  /** Optional chunks from repo-sync namespace (full codebase context) */
   repoContextSnippets: string[];
   prd?: {
     problemStatement: string;
@@ -134,6 +151,7 @@ type ReviewInput = {
     acceptanceCriteria: string[];
   } | null;
   tasks?: {
+    id: string;
     title: string;
     description: string | null;
     status: string;
@@ -177,7 +195,7 @@ ${input.prd.acceptanceCriteria.map((ac) => `- ${ac}`).join("\n")}
     tasksContext = `
 =========================================
 PLANNED ENGINEERING TASKS:
-${input.tasks.map((t) => `- [${t.status.toUpperCase()}] ${t.title}: ${t.description ?? "No description"}`).join("\n")}
+${input.tasks.map((t) => `- [ID: ${t.id}] [${t.status.toUpperCase()}] ${t.title}: ${t.description ?? "No description"}`).join("\n")}
 =========================================
 `;
   }

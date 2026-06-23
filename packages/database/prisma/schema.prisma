@@ -44,6 +44,8 @@ model PullRequest {
   reviewedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  featureRequestId String?
+  featureRequest   FeatureRequest? @relation(fields: [featureRequestId], references: [id], onDelete: SetNull)
 
   @@unique([repoFullName, prNumber])
   @@map("pull_request")
@@ -75,6 +77,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   githubInstallation GithubInstallation?
+  workspaceMembers   WorkspaceMember[]
   
   @@unique([email])
   @@map("user")
@@ -126,4 +129,107 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  members   WorkspaceMember[]
+  projects  Project[]
+
+  @@map("workspace")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("member") // owner | member
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_member")
+}
+
+model Project {
+  id              String           @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  repoFullName    String           // e.g. "owner/repo"
+  branch          String           @default("main")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  featureRequests FeatureRequest[]
+  tasks           Task[]
+
+  @@map("project")
+}
+
+model FeatureRequest {
+  id           String                @id @default(cuid())
+  projectId    String
+  project      Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  status       String                @default("discovery") // discovery | prd_generation | planning | development | ready_for_review | ready_for_release | shipped
+  source       String                @default("web_form")  // web_form | email | support
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  prd          PRD?
+  pullRequests PullRequest[]
+  chatMessages FeatureRequestChat[]
+
+  @@map("feature_request")
+}
+
+model FeatureRequestChat {
+  id               String         @id @default(cuid())
+  featureRequestId String
+  featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  sender           String         // user | ai
+  message          String
+  createdAt        DateTime       @default(now())
+
+  @@map("feature_request_chat")
+}
+
+model PRD {
+  id                 String         @id @default(cuid())
+  featureRequestId   String         @unique
+  featureRequest     FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  problemStatement   String
+  goals              String[]
+  nonGoals           String[]
+  userStories        String[]
+  acceptanceCriteria String[]
+  edgeCases          String[]
+  successMetrics     String[]
+  rawContent         String?        // Full Markdown version of the PRD
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  tasks              Task[]
+
+  @@map("prd")
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prdId       String?
+  prd         PRD?     @relation(fields: [prdId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  status      String   @default("todo") // todo | in_progress | review | done
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("task")
 }

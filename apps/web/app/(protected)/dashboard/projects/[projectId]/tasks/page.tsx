@@ -353,7 +353,8 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                     return (
                       <Card
                         key={task.id}
-                        className="border-border bg-card shadow-xs hover:shadow-md transition-shadow duration-200 group relative overflow-hidden"
+                        size="sm"
+                        className="shrink-0 border-border bg-card shadow-xs hover:shadow-md transition-all duration-200 group relative overflow-hidden rounded-xl py-3"
                       >
                         <CardHeader className="p-3 pb-1.5 flex flex-row items-start justify-between gap-2">
                           <div className="space-y-1 flex-1">

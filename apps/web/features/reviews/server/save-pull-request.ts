@@ -20,6 +20,30 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function getKeywords(title: string): string[] {
+  const words = title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .split(/[\s_-]+/)
+    .filter((w) => w.length > 3); // Remove short words/verbs like 'add', 'the', 'for'
+  return Array.from(new Set(words));
+}
+
+function matchKeywords(featureKeywords: string[], targetText: string): boolean {
+  if (featureKeywords.length === 0) return false;
+  const targetLower = targetText.toLowerCase();
+  
+  let matches = 0;
+  for (const keyword of featureKeywords) {
+    if (targetLower.includes(keyword)) {
+      matches++;
+    }
+  }
+  
+  const matchRatio = matches / featureKeywords.length;
+  return matches >= 2 && matchRatio >= 0.6;
+}
+
 async function findMatchingFeatureRequest(
   repoFullName: string,
   branchName: string,
@@ -61,7 +85,19 @@ async function findMatchingFeatureRequest(
     }
   }
 
-  // 3. Fallback: If only one active feature is in development, link it
+  // 3. Keyword token-based matches in branch, title, or body
+  for (const feature of activeFeatures) {
+    const keywords = getKeywords(feature.title);
+    if (
+      matchKeywords(keywords, normalizedBranch) ||
+      matchKeywords(keywords, normalizedTitle) ||
+      matchKeywords(keywords, normalizedBody)
+    ) {
+      return feature.id;
+    }
+  }
+
+  // 4. Fallback: If only one active feature is in development, link it
   const devFeatures = activeFeatures.filter((f) => f.status === "development");
   if (devFeatures.length === 1) {
     return devFeatures[0].id;

@@ -25,15 +25,22 @@ Prioritize:
 * Readability
 
 Focus on meaningful issues only.
-Do NOT invent hypothetical problems that are not supported by the diff.
 Do NOT nitpick formatting or style unless it affects maintainability or correctness.
+
+# PRD Compliance & Unimplemented Requirements
+If a PRD is provided, compare the PRD's goals and acceptance criteria against the code changes:
+* You MUST check if any of the PRD requirements or acceptance criteria are completely missing (unimplemented) in the diff.
+* If a feature, view, API endpoint, or validation specified in the PRD is not present in the code changes:
+  - If the Pull Request is linked to the feature request ("Is linked to a feature request: true"), you MUST report it as a [BLOCKING] finding.
+  - If the Pull Request is NOT linked to the feature request ("Is linked to a feature request: false"), do NOT flag completely missing requirements as [BLOCKING] if the changes are unrelated. However, if the changes attempt to implement the PRD but are incomplete or broken, flag them accordingly.
+* Note: Flagging completely missing/unimplemented requirements is a primary responsibility and is NOT considered "speculative" or "inventing hypothetical problems".
 
 ---
 
 # Severity Classification
 
 Every finding must be classified as either:
-* [BLOCKING]: Any failing or missing PRD acceptance criteria, functional logic bugs, security vulnerabilities (SQLi, CSRF, auth flaws), critical crash loops, or major regressions.
+* [BLOCKING]: Any failing or missing PRD acceptance criteria (for linked PRs), functional logic bugs, security vulnerabilities (SQLi, CSRF, auth flaws), critical crash loops, or major regressions.
 * [NON-BLOCKING]: Code style, refactoring suggestions, minor improvements, non-critical optimizations.
 
 ---
@@ -45,9 +52,9 @@ Start with:
 ## Verdict
 
 One of:
-* APPROVE (Use this if all PRD criteria are met and there are zero [BLOCKING] findings)
-* APPROVE WITH SUGGESTIONS (Use this if all PRD criteria are met, there are zero [BLOCKING] findings, but you have [NON-BLOCKING] suggestions)
-* REQUEST CHANGES (Use this if there is at least one [BLOCKING] finding)
+* APPROVE (Use this if all criteria are met and there are zero [BLOCKING] findings)
+* APPROVE WITH SUGGESTIONS (Use this if all criteria are met, there are zero [BLOCKING] findings, but you have [NON-BLOCKING] suggestions)
+* REQUEST CHANGES (Use this if there is at least one [BLOCKING] finding in either section)
 
 Then provide a one-sentence summary.
 
@@ -61,39 +68,47 @@ List notable strengths, particularly how requirements or criteria were well impl
 
 ---
 
-If issues exist:
-
 ## 🚨 Findings
 
-For each finding use:
+Divide the findings into two clear sections:
 
-### [SEVERITY] Short Title
+### 📋 PRD Compliance & Requirements
+(Only list items here if a PRD is provided. If no PRD is provided, write "No PRD context linked to this Pull Request." If a PRD is provided but the PR is not linked to it, evaluate the implementation of any targeted features, or state: "This Pull Request is not linked to a specific feature request. Implemented changes are unrelated to the active PRD goals.")
+
+For each finding in this section, use this format:
+#### [SEVERITY] Short Title
 (SEVERITY must be exactly either [BLOCKING] or [NON-BLOCKING])
+* **Confidence:** High | Medium | Low
+* **Location:** Relevant file/function/context
+* **Problem:** Explain which PRD criteria or task is missing or failed.
+* **Impact:** Explain why it matters.
+* **Recommended Fix:** Explain how to fix it.
+* **Example Patch:** Provide code example if helpful.
 
-**Confidence:** High | Medium | Low
-
-**Location:**
-Relevant file/function/context
-
-**Problem:**
-Explain what is wrong or what PRD criteria is missing/failed.
-
-**Impact:**
-Explain why it matters.
-
-**Recommended Fix:**
-Explain how to fix it.
-
-**Example Patch:**
-Provide a small code example when possible.
+If no PRD compliance issues are found (and a PRD is provided), write: "All implemented changes comply with the PRD goals and acceptance criteria."
 
 ---
 
-If no issues are found:
+### 💻 General Code Quality & Security
+(List general bugs, security vulnerabilities, performance, reliability, or maintainability issues here.)
+
+For each finding in this section, use this format:
+#### [SEVERITY] Short Title
+(SEVERITY must be exactly either [BLOCKING] or [NON-BLOCKING])
+* **Confidence:** High | Medium | Low
+* **Location:** Relevant file/function/context
+* **Problem:** Explain the bug, security issue, or design flaw.
+* **Impact:** Explain why it matters.
+* **Recommended Fix:** Explain how to fix it.
+* **Example Patch:** Provide code example if helpful.
+
+If no general issues are found, write: "No bugs, security issues, performance regressions, or maintainability concerns identified in the changes."
+
+---
 
 ## ✅ Review Result
 
-The diff appears production-ready and fully implements the PRD specifications. No correctness, security, reliability, performance, or maintainability concerns were identified.
+Provide a brief summary statement of the review findings.
 
 ---
 
@@ -108,6 +123,7 @@ The diff appears production-ready and fully implements the PRD specifications. N
 type ReviewInput = {
   repoFullName: string;
   title: string;
+  isLinkedToFeature: boolean;
   /** Chunks retrieved from the PR's Pinecone namespace */
   contextSnippets: string[];
   /** Optional chunks from repo-sync namespace (full codebase context) */
@@ -171,6 +187,7 @@ ${input.tasks.map((t) => `- [${t.status.toUpperCase()}] ${t.title}: ${t.descript
     system: SYSTEM_PROMPT,
     prompt: `Repository: ${input.repoFullName}
   Pull request title: ${input.title}
+  Is linked to a feature request: ${input.isLinkedToFeature}
   ${prdContext}
   ${tasksContext}
   

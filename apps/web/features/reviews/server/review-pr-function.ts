@@ -66,38 +66,75 @@ export const reviewPullRequest = inngest.createFunction(
       });
   
       const prdContext = await step.run("fetch-prd-context", async () => {
-        if (!pullRequest.featureRequestId) {
-          return null;
-        }
-
-        const feature = await prisma.featureRequest.findUnique({
-          where: { id: pullRequest.featureRequestId },
-          include: {
-            prd: true,
-            project: {
-              include: {
-                tasks: true
+        if (pullRequest.featureRequestId) {
+          const feature = await prisma.featureRequest.findUnique({
+            where: { id: pullRequest.featureRequestId },
+            include: {
+              prd: true,
+              project: {
+                include: {
+                  tasks: true
+                }
               }
             }
-          }
-        });
+          });
 
-        if (!feature || !feature.prd) {
-          return null;
+          if (feature && feature.prd) {
+            return {
+              isLinked: true,
+              prd: {
+                problemStatement: feature.prd.problemStatement,
+                goals: feature.prd.goals,
+                acceptanceCriteria: feature.prd.acceptanceCriteria,
+              },
+              tasks: feature.project.tasks.map(t => ({
+                title: t.title,
+                description: t.description,
+                status: t.status,
+              })),
+            };
+          }
         }
 
-        return {
-          prd: {
-            problemStatement: feature.prd.problemStatement,
-            goals: feature.prd.goals,
-            acceptanceCriteria: feature.prd.acceptanceCriteria,
-          },
-          tasks: feature.project.tasks.map(t => ({
-            title: t.title,
-            description: t.description,
-            status: t.status,
-          })),
-        };
+        // Fallback: If not linked, check if there's an active feature request for this project
+        const project = await prisma.project.findFirst({
+          where: { repoFullName: pullRequest.repoFullName },
+        });
+
+        if (project) {
+          const activeFeature = await prisma.featureRequest.findFirst({
+            where: {
+              projectId: project.id,
+              status: { in: ["development", "planning", "prd_generation", "ready_for_review"] },
+            },
+            include: {
+              prd: true,
+            },
+            orderBy: { updatedAt: "desc" },
+          });
+
+          if (activeFeature && activeFeature.prd) {
+            const tasks = await prisma.task.findMany({
+              where: { projectId: project.id },
+            });
+
+            return {
+              isLinked: false,
+              prd: {
+                problemStatement: activeFeature.prd.problemStatement,
+                goals: activeFeature.prd.goals,
+                acceptanceCriteria: activeFeature.prd.acceptanceCriteria,
+              },
+              tasks: tasks.map(t => ({
+                title: t.title,
+                description: t.description,
+                status: t.status,
+              })),
+            };
+          }
+        }
+
+        return null;
       });
 
       const review = await step.run("generate-ai-review", async () => {
@@ -109,6 +146,7 @@ export const reviewPullRequest = inngest.createFunction(
         return generateReview({
           repoFullName: pullRequest.repoFullName,
           title: pullRequest.title,
+          isLinkedToFeature: prdContext?.isLinked ?? false,
           contextSnippets,
           repoContextSnippets,
           prd: prdContext?.prd ?? null,

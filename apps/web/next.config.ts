@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/trpc/:path*",
-        destination: "http://localhost:5000/trpc/:path*",
+        destination: `${process.env.BACKEND_API_URL || "http://localhost:5000"}/trpc/:path*`,
       },
     ];
   },

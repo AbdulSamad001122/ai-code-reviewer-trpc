@@ -31,10 +31,12 @@ import {
   X,
   ArrowSquareOut,
   Sparkle,
+  Trash,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Spinner } from "@/components/ui/spinner";
+import { useRouter } from "next/navigation";
 
 function MarkdownRenderer({ content }: { content: string }) {
   if (!content) return null;
@@ -135,10 +137,24 @@ export default function FeatureDetailPage({
   params: Promise<{ projectId: string; featureId: string }>;
 }) {
   const { projectId, featureId } = use(params);
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("chat");
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deleteMutation = trpc.features.delete.useMutation({
+    onSuccess: () => {
+      setShowDeleteConfirm(false);
+      router.push(`/dashboard/projects/${projectId}/features`);
+    },
+  });
+
+  const handleDeleteConfirm = () => {
+    deleteMutation.mutate({ featureId });
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -305,22 +321,34 @@ export default function FeatureDetailPage({
               {formatDistanceToNow(new Date(feature.createdAt), { addSuffix: true })}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="size-3" />
-              Status:
-            </span>
-            <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase ${
-                feature.status === "shipped"
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                  : feature.status === "discovery"
-                  ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
-                  : "bg-purple-500/10 text-purple-500 border border-purple-500/20"
-              }`}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="size-3" />
+                Status:
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase ${
+                  feature.status === "shipped"
+                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                    : feature.status === "discovery"
+                    ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                    : "bg-purple-500/10 text-purple-500 border border-purple-500/20"
+                }`}
+              >
+                {feature.status.replace("_", " ")}
+              </span>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive cursor-pointer flex items-center gap-1.5 font-semibold"
+              onClick={() => setShowDeleteConfirm(true)}
             >
-              {feature.status.replace("_", " ")}
-            </span>
+              <Trash className="size-3.5" />
+              Delete
+            </Button>
           </div>
         </div>
       </div>
@@ -861,6 +889,49 @@ export default function FeatureDetailPage({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="border-border bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-destructive flex items-center gap-2">
+              <Trash className="size-5" />
+              Delete Feature Request
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm leading-relaxed mt-2">
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{feature.title}"</span>?
+              <br /><br />
+              This action will:
+              <br />
+              1. Permanently delete the feature request, its PRD, chat messages, and Kanban board tasks.
+              <br />
+              2. Delete the associated specifications folder <code className="bg-muted px-1 py-0.5 rounded text-xs">.shipflow/features/{feature.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")}</code> from your GitHub repository.
+              <br /><br />
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleteMutation.isPending}
+              className="border-border cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteConfirm}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90 text-white cursor-pointer font-semibold"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Yes, Delete Feature"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

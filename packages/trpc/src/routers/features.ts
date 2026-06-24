@@ -52,7 +52,16 @@ export const featuresRouter = router({
     .mutation(async ({ ctx, input }) => {
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
-        select: { workspaceId: true },
+        include: {
+          workspace: {
+            include: {
+              members: {
+                where: { role: "owner" },
+                include: { user: true },
+              },
+            },
+          },
+        },
       });
 
       if (!project) {
@@ -70,6 +79,22 @@ export const featuresRouter = router({
 
       if (!membership) {
         throw new Error("Unauthorized workspace access");
+      }
+
+      const ownerMember = project.workspace.members[0];
+      if (ownerMember) {
+        const owner = ownerMember.user;
+        const isPaid = owner.subscriptionStatus === "active" || owner.subscriptionStatus === "trialing";
+        const plan = isPaid ? owner.subscriptionPlan : "free";
+
+        const featureCount = await prisma.featureRequest.count({
+          where: { projectId: input.projectId },
+        });
+
+        const maxFeatures = plan === "unlimited" ? Infinity : (plan === "starter" ? 3 : 1);
+        if (featureCount >= maxFeatures) {
+          throw new Error(`Feature request limit reached. The current plan only allows up to ${maxFeatures} features per project.`);
+        }
       }
 
       const feature = await prisma.featureRequest.create({
@@ -326,5 +351,87 @@ export const featuresRouter = router({
       }
 
       return updatedFeature;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ featureId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const feature = await prisma.featureRequest.findUnique({
+        where: { id: input.featureId },
+        include: {
+          project: true,
+          prd: true,
+        },
+      });
+
+      if (!feature) {
+        throw new Error("Feature request not found");
+      }
+
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: feature.project.workspaceId,
+            userId: ctx.user.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("Unauthorized workspace access");
+      }
+
+      // 1. Trigger the background deletion on Git (passing metadata to avoid db lookup during function execution)
+      const slug = feature.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "");
+
+      let installationId = 0;
+      try {
+        const ownerMember = await prisma.workspaceMember.findFirst({
+          where: { workspaceId: feature.project.workspaceId, role: "owner" },
+          include: { user: { include: { githubInstallation: true } } }
+        });
+        if (ownerMember?.user?.githubInstallation?.installationId) {
+          installationId = ownerMember.user.githubInstallation.installationId;
+        } else {
+          const repoSync = await prisma.repoSync.findUnique({
+            where: { repoFullName: feature.project.repoFullName }
+          });
+          if (repoSync?.installationId) {
+            installationId = repoSync.installationId;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to find installation ID for feature deletion sync:", e);
+      }
+
+      if (installationId) {
+        await inngest.send({
+          name: "app/feature.deleted",
+          data: {
+            slug,
+            repoFullName: feature.project.repoFullName,
+            branch: feature.project.branch,
+            installationId,
+            title: feature.title,
+          },
+        });
+      }
+
+      // 2. Delete tasks associated with the feature
+      if (feature.prd) {
+        await prisma.task.deleteMany({
+          where: { prdId: feature.prd.id },
+        });
+      }
+
+      // 3. Delete feature request
+      const deletedFeature = await prisma.featureRequest.delete({
+        where: { id: input.featureId },
+      });
+
+      return deletedFeature;
     }),
 });

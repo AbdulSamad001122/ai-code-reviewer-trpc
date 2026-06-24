@@ -5,6 +5,7 @@ import { workspaceRouter } from "./routers/workspace.js";
 import { projectRouter } from "./routers/project.js";
 import { featuresRouter } from "./routers/features.js";
 import { tasksRouter } from "./routers/tasks.js";
+import { billingRouter } from "./routers/billing.js";
 
 export const appRouter = router({
     health: publicProcedure.query(() => {
@@ -18,6 +19,7 @@ export const appRouter = router({
     project: projectRouter,
     features: featuresRouter,
     tasks: tasksRouter,
+    billing: billingRouter,
 });
 
 export type AppRouter = typeof appRouter;

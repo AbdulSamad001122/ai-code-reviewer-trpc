@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, ChatText, ArrowRight, Kanban, GitCommit } from "@phosphor-icons/react";
+import { Plus, ChatText, ArrowRight, Kanban, GitCommit, Trash } from "@phosphor-icons/react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Spinner } from "@/components/ui/spinner";
@@ -71,6 +71,22 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
       refetchFeatures();
     },
   });
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedFeatureId, setSelectedFeatureId] = useState("");
+  const [selectedFeatureTitle, setSelectedFeatureTitle] = useState("");
+
+  const deleteFeatureMutation = trpc.features.delete.useMutation({
+    onSuccess: () => {
+      setShowDeleteDialog(false);
+      refetchFeatures();
+    },
+  });
+
+  const handleDeleteConfirm = () => {
+    if (!selectedFeatureId) return;
+    deleteFeatureMutation.mutate({ featureId: selectedFeatureId });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,17 +266,31 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
                     {formatDistanceToNow(new Date(feature.createdAt), { addSuffix: true })}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      render={
-                        <Link href={`/dashboard/projects/${projectId}/features/${feature.id}`} className="gap-1">
-                          Open
-                          <ArrowRight className="size-3" />
-                        </Link>
-                      }
-                      variant="ghost"
-                      size="sm"
-                      className="cursor-pointer text-primary hover:text-primary/95"
-                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        render={
+                          <Link href={`/dashboard/projects/${projectId}/features/${feature.id}`} className="gap-1">
+                            Open
+                            <ArrowRight className="size-3" />
+                          </Link>
+                        }
+                        variant="ghost"
+                        size="sm"
+                        className="cursor-pointer text-primary hover:text-primary/95"
+                      />
+                      <Button
+                        onClick={() => {
+                          setSelectedFeatureId(feature.id);
+                          setSelectedFeatureTitle(feature.title);
+                          setShowDeleteDialog(true);
+                        }}
+                        variant="ghost"
+                        size="icon"
+                        className="cursor-pointer size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash className="size-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -268,6 +298,49 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
           </Table>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="border-border bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-destructive flex items-center gap-2">
+              <Trash className="size-5" />
+              Delete Feature Request
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm leading-relaxed mt-2">
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{selectedFeatureTitle}"</span>?
+              <br /><br />
+              This action will:
+              <br />
+              1. Permanently delete the feature request, its PRD, chat messages, and Kanban board tasks.
+              <br />
+              2. Delete the associated specifications folder <code className="bg-muted px-1 py-0.5 rounded text-xs">.shipflow/features/{selectedFeatureTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")}</code> from your GitHub repository.
+              <br /><br />
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={deleteFeatureMutation.isPending}
+              className="border-border cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteConfirm}
+              disabled={deleteFeatureMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90 text-white cursor-pointer font-semibold"
+            >
+              {deleteFeatureMutation.isPending ? "Deleting..." : "Yes, Delete Feature"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

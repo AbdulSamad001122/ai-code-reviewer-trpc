@@ -10,7 +10,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const [trpcClient] = useState(() => trpc.createClient({
         links: [
             httpBatchLink({
-                url: typeof window !== "undefined" ? "/api/trpc" : "http://localhost:5000/trpc",
+                url: typeof window !== "undefined" ? "/api/trpc" : `${process.env.BACKEND_API_URL || "http://localhost:5000"}/trpc`,
                 fetch(url, options) {
                     return fetch(url, {
                         ...options,

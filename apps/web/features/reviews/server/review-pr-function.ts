@@ -19,6 +19,91 @@ export const reviewPullRequest = inngest.createFunction(
           data: { status: "processing" },
         });
       });
+
+      const limitCheck = await step.run("check-billing-limits", async () => {
+        const project = pullRequest.featureRequestId
+          ? await prisma.project.findFirst({
+              where: { featureRequests: { some: { id: pullRequest.featureRequestId } } },
+              include: {
+                workspace: {
+                  include: {
+                    members: {
+                      where: { role: "owner" },
+                      include: { user: true },
+                    },
+                  },
+                },
+              },
+            })
+          : await prisma.project.findFirst({
+              where: { repoFullName: pullRequest.repoFullName },
+              include: {
+                workspace: {
+                  include: {
+                    members: {
+                      where: { role: "owner" },
+                      include: { user: true },
+                    },
+                  },
+                },
+              },
+            });
+
+        if (!project || !project.workspace) {
+          return { allowed: true, count: 0, maxReviews: 0, ownerId: "" };
+        }
+
+        const ownerMember = project.workspace.members[0];
+        if (!ownerMember || !ownerMember.user) {
+          return { allowed: true, count: 0, maxReviews: 0, ownerId: "" };
+        }
+
+        const owner = ownerMember.user;
+        const isPaid = owner.subscriptionStatus === "active" || owner.subscriptionStatus === "trialing";
+        const plan = isPaid ? owner.subscriptionPlan : "free";
+        const count = owner.prReviewCount || 0;
+
+        const maxReviews = plan === "unlimited" ? Infinity : (plan === "starter" ? 12 : 2);
+
+        if (count >= maxReviews) {
+          return { allowed: false, count, maxReviews, ownerId: owner.id };
+        }
+
+        await prisma.user.update({
+          where: { id: owner.id },
+          data: { prReviewCount: { increment: 1 } },
+        });
+
+        return { allowed: true, count: 0, maxReviews: 0, ownerId: "" };
+      });
+
+      if (!limitCheck.allowed) {
+        await step.run("mark-rate-limited", async () => {
+          await prisma.pullRequest.update({
+            where: { id: pullRequestId },
+            data: { status: "rate_limited" },
+          });
+
+          await postPrComment(
+            pullRequest.installationId,
+            pullRequest.repoFullName,
+            pullRequest.prNumber,
+            `⚠️ **PR Review Limit Reached**\n\nThe workspace owner has reached the PR review limit for their plan (${limitCheck.count}/${limitCheck.maxReviews} reviews analyzed).\n\nPlease upgrade the subscription in settings to continue analyzing Pull Requests.`
+          );
+
+          if (pullRequest.featureRequestId) {
+            await prisma.featureRequestChat.create({
+              data: {
+                featureRequestId: pullRequest.featureRequestId,
+                sender: "ai",
+                message: `⚠️ **PR Review Limit Reached**: The workspace owner has reached the PR review limit for their plan (${limitCheck.count}/${limitCheck.maxReviews} reviews analyzed). Please upgrade the subscription in settings to analyze this PR.`,
+              },
+            });
+          }
+        });
+
+        return { pullRequestId, status: "rate_limited", reason: "limit exceeded" };
+      }
   
       const chunks = await step.run("breakdown-code", async () => {
         const files = await getPullRequestFiles(

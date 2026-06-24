@@ -1,6 +1,9 @@
 import { router, protectedProcedure } from "../trpc.js";
 import { z } from "zod";
 import { prisma } from "@ai-code-reviewer-trpc/database";
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "ai-code-reviewer" });
 
 export const tasksRouter = router({
   list: protectedProcedure
@@ -78,6 +81,19 @@ export const tasksRouter = router({
         },
       });
 
+      if (task.prdId) {
+        const prd = await prisma.pRD.findUnique({
+          where: { id: task.prdId },
+          select: { featureRequestId: true },
+        });
+        if (prd?.featureRequestId) {
+          await inngest.send({
+            name: "app/git_sync.requested",
+            data: { featureId: prd.featureRequestId },
+          });
+        }
+      }
+
       return task;
     }),
 
@@ -120,6 +136,19 @@ export const tasksRouter = router({
         data: { status: input.status },
       });
 
+      if (updatedTask.prdId) {
+        const prd = await prisma.pRD.findUnique({
+          where: { id: updatedTask.prdId },
+          select: { featureRequestId: true },
+        });
+        if (prd?.featureRequestId) {
+          await inngest.send({
+            name: "app/git_sync.requested",
+            data: { featureId: prd.featureRequestId },
+          });
+        }
+      }
+
       return updatedTask;
     }),
 
@@ -155,6 +184,19 @@ export const tasksRouter = router({
       const deletedTask = await prisma.task.delete({
         where: { id: input.taskId },
       });
+
+      if (deletedTask.prdId) {
+        const prd = await prisma.pRD.findUnique({
+          where: { id: deletedTask.prdId },
+          select: { featureRequestId: true },
+        });
+        if (prd?.featureRequestId) {
+          await inngest.send({
+            name: "app/git_sync.requested",
+            data: { featureId: prd.featureRequestId },
+          });
+        }
+      }
 
       return deletedTask;
     }),

@@ -67,18 +67,26 @@ model RepoSync {
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  githubInstallation GithubInstallation?
-  workspaceMembers   WorkspaceMember[]
+  id                  String    @id
+  name                String
+  email               String
+  emailVerified       Boolean   @default(false)
+  image               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  sessions            Session[]
+  accounts            Account[]
+  githubInstallation   GithubInstallation?
+  workspaceMembers     WorkspaceMember[]
   
+  // Billing and tier details
+  subscriptionPlan    String    @default("free") // "free" | "starter" | "unlimited"
+  lemonSqueezySubId   String?   @unique
+  lemonSqueezyCustId  String?
+  subscriptionStatus  String?   @default("inactive")
+  prReviewCount       Int       @default(0)
+  renewsAt            DateTime?
+
   @@unique([email])
   @@map("user")
 }

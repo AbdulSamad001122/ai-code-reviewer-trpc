@@ -19,6 +19,27 @@ export const workspaceRouter = router({
   create: protectedProcedure
     .input(z.object({ name: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.user.id },
+        select: { subscriptionPlan: true, subscriptionStatus: true },
+      });
+
+      const isPaid = user?.subscriptionStatus === "active" || user?.subscriptionStatus === "trialing";
+      const plan = isPaid ? user?.subscriptionPlan : "free";
+
+      if (plan !== "unlimited") {
+        const ownedCount = await prisma.workspaceMember.count({
+          where: {
+            userId: ctx.user.id,
+            role: "owner",
+          },
+        });
+
+        if (ownedCount >= 1) {
+          throw new Error("Workspace limit reached. Upgrade to the Unlimited plan to create more workspaces.");
+        }
+      }
+
       const workspace = await prisma.workspace.create({
         data: {
           name: input.name,

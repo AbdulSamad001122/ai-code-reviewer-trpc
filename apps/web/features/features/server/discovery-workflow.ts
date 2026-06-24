@@ -380,6 +380,13 @@ Break this down into 3-6 clear, actionable development tasks (e.g. backend api c
       }
     });
 
+    await step.run("trigger-git-sync", async () => {
+      await inngest.send({
+        name: "app/git_sync.requested",
+        data: { featureId: featureRequestId }
+      });
+    });
+
     return { status: "planning", reason: "PRD and tasks generated successfully" };
   }
 );
@@ -500,6 +507,13 @@ Identify 1-3 new technical engineering tasks that the developers/agents must com
       for (const t of tasksToCreate) {
         await prisma.task.create({ data: t });
       }
+    });
+
+    await step.run("trigger-git-sync", async () => {
+      await inngest.send({
+        name: "app/git_sync.requested",
+        data: { featureId: featureRequestId }
+      });
     });
 
     await step.run("advance-to-planning", async () => {

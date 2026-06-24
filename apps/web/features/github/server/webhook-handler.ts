@@ -41,7 +41,30 @@ export async function handleGithubWebhook(request:Request) {
     return Response.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  if(eventName !== "pull_request"){
+  if (eventName !== "pull_request" && eventName !== "push") {
+    return Response.json({ received: true });
+  }
+
+  if (eventName === "push") {
+    const event = JSON.parse(payload);
+    
+    // Filter out commits made by the GitHub app itself to prevent feedback loops
+    const pusherName = event.pusher?.name || "";
+    if (pusherName.includes("shipflow") || pusherName.includes("parrot-code-reviewer") || event.sender?.login?.includes("shipflow")) {
+      return Response.json({ received: true, ignored: true, reason: "Self commit" });
+    }
+
+    const branch = event.ref.replace("refs/heads/", "");
+
+    await inngest.send({
+      name: "github/push.received",
+      data: {
+        installationId: event.installation.id,
+        repoFullName: event.repository.full_name,
+        branch,
+      },
+    });
+
     return Response.json({ received: true });
   }
 

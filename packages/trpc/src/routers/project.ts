@@ -51,6 +51,27 @@ export const projectRouter = router({
         throw new Error("Unauthorized workspace access");
       }
 
+      // Find the workspace owner
+      const ownerMember = await prisma.workspaceMember.findFirst({
+        where: { workspaceId: input.workspaceId, role: "owner" },
+        include: { user: true },
+      });
+
+      if (ownerMember) {
+        const owner = ownerMember.user;
+        const isPaid = owner.subscriptionStatus === "active" || owner.subscriptionStatus === "trialing";
+        const plan = isPaid ? owner.subscriptionPlan : "free";
+
+        const projectCount = await prisma.project.count({
+          where: { workspaceId: input.workspaceId },
+        });
+
+        const maxProjects = plan === "unlimited" ? Infinity : (plan === "starter" ? 3 : 1);
+        if (projectCount >= maxProjects) {
+          throw new Error(`Project limit reached. The current plan only allows up to ${maxProjects} projects in this workspace.`);
+        }
+      }
+
       const project = await prisma.project.create({
         data: {
           workspaceId: input.workspaceId,
@@ -83,5 +104,30 @@ export const projectRouter = router({
       }
 
       return project;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await prisma.project.findFirst({
+        where: {
+          id: input.projectId,
+          workspace: {
+            members: {
+              some: { userId: ctx.user.id, role: "owner" },
+            },
+          },
+        },
+      });
+
+      if (!project) {
+        throw new Error("Project not found or you are not authorized to delete it (must be workspace owner)");
+      }
+
+      const deletedProject = await prisma.project.delete({
+        where: { id: input.projectId },
+      });
+
+      return deletedProject;
     }),
 });

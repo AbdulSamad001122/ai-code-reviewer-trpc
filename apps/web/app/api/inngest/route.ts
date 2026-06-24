@@ -3,7 +3,11 @@ import { inngest } from "@/features/inngest/client";
 import { processTask } from "./function";
 import { reviewPullRequest } from "@/features/reviews/server/review-pr-function";
 import { syncRepoCodebaseFunction } from "@/features/repo-sync/server/sync-repo-function";
-import { onFeatureCreatedFunction, onFeatureChatReceivedFunction } from "@/features/features/server/discovery-workflow";
+import {
+  onFeatureCreatedFunction,
+  onFeatureChatReceivedFunction,
+  onFeatureReleaseRejectedFunction,
+} from "@/features/features/server/discovery-workflow";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -13,5 +17,6 @@ export const { GET, POST, PUT } = serve({
     syncRepoCodebaseFunction,
     onFeatureCreatedFunction,
     onFeatureChatReceivedFunction,
+    onFeatureReleaseRejectedFunction,
   ],
 });

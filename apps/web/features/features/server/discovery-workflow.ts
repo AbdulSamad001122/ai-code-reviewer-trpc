@@ -213,6 +213,7 @@ export const onFeatureChatReceivedFunction = inngest.createFunction(
 
     const checkResult = await step.run("check-requirements-sufficiency", async () => {
       const systemPrompt = `You are a Senior Product Manager. Your task is to analyze a feature request and the requirements discussion history, and decide if you have enough clear, detailed information to compile a structured Product Requirements Document (PRD).
+* CRITICAL RULE: If the user explicitly chose to skip a question, bypass it, or requests to proceed and compile the PRD now, you MUST set "sufficient" to true immediately. Do not ask another question.
 You must reply ONLY with a JSON object in this format:
 {
   "sufficient": boolean,
@@ -380,6 +381,144 @@ Break this down into 3-6 clear, actionable development tasks (e.g. backend api c
     });
 
     return { status: "planning", reason: "PRD and tasks generated successfully" };
+  }
+);
+
+export const onFeatureReleaseRejectedFunction = inngest.createFunction(
+  {
+    id: "on-feature-release-rejected",
+    triggers: { event: "app/feature.release_rejected" },
+  },
+  async ({ event, step }) => {
+    const { featureRequestId, reason } = event.data;
+
+    const { featureRequest, prd } = await step.run("fetch-feature-and-prd", async () => {
+      const feat = await prisma.featureRequest.findUnique({
+        where: { id: featureRequestId },
+        include: { prd: true },
+      });
+      if (!feat) throw new Error("Feature request not found");
+      if (!feat.prd) throw new Error("PRD not found for this feature request");
+      return { featureRequest: feat, prd: feat.prd };
+    });
+
+    const updatedPrdData = await step.run("revise-prd", async () => {
+      const systemPrompt = `You are a Senior Product Manager. Your task is to revise an existing Product Requirements Document (PRD) to incorporate human rejection feedback.
+You must reply ONLY with a JSON object in this format:
+{
+  "problemStatement": string,
+  "goals": string[],
+  "nonGoals": string[],
+  "userStories": string[],
+  "acceptanceCriteria": string[],
+  "edgeCases": string[],
+  "successMetrics": string[],
+  "markdown": string
+}
+In the "markdown" property, provide the revised full PRD in Github Markdown format. Make sure the updates addressing the rejection reason are highlighted or documented. Do not include any other text outside the JSON.`;
+
+      const userPrompt = `Rejection Feedback: ${reason}
+      
+Original PRD Details:
+Problem Statement: ${prd.problemStatement}
+Goals: ${prd.goals.join(", ")}
+Acceptance Criteria:
+${prd.acceptanceCriteria.map((ac) => `- ${ac}`).join("\n")}
+Edge Cases:
+${prd.edgeCases.map((ec) => `- ${ec}`).join("\n")}
+
+Revise this PRD to address the rejection feedback.`;
+
+      return generateJson<PrdResponse>(systemPrompt, userPrompt);
+    });
+
+    await step.run("update-prd-record", async () => {
+      await prisma.pRD.update({
+        where: { featureRequestId },
+        data: {
+          problemStatement: updatedPrdData.problemStatement,
+          goals: updatedPrdData.goals,
+          nonGoals: updatedPrdData.nonGoals,
+          userStories: updatedPrdData.userStories,
+          acceptanceCriteria: updatedPrdData.acceptanceCriteria,
+          edgeCases: updatedPrdData.edgeCases,
+          successMetrics: updatedPrdData.successMetrics,
+          rawContent: updatedPrdData.markdown,
+        },
+      });
+    });
+
+    const newTasks = await step.run("generate-rejection-tasks", async () => {
+      const systemPrompt = `You are a Technical Lead. A human reviewer has rejected a release. Based on their rejection feedback and the updated PRD goals/acceptance criteria, identify any NEW or MODIFIED technical tasks required to address the issues.
+You must reply ONLY with a JSON array in this format:
+[
+  {
+    "title": "string",
+    "description": "string"
+  }
+]
+Do not include any other text outside the JSON array.`;
+
+      const userPrompt = `Rejection Feedback: ${reason}
+      
+Updated Goals: ${updatedPrdData.goals.join(", ")}
+Updated Acceptance Criteria:
+${updatedPrdData.acceptanceCriteria.map((ac) => `- ${ac}`).join("\n")}
+
+Identify 1-3 new technical engineering tasks that the developers/agents must complete to address the rejection feedback.`;
+
+      const text = await generateTextWithRetry(systemPrompt, userPrompt);
+
+      try {
+        const start = text.indexOf("[");
+        const end = text.lastIndexOf("]");
+        if (start === -1 || end === -1) {
+          throw new Error("No JSON array found in response");
+        }
+        const jsonStr = text.substring(start, end + 1);
+        return JSON.parse(jsonStr) as { title: string; description: string }[];
+      } catch (error) {
+        console.error("Failed to parse rejection tasks list. Raw response was:", text);
+        return [
+          {
+            title: `Address Release Rejection: ${reason.substring(0, 40)}...`,
+            description: `Implement code updates to resolve: ${reason}`,
+          },
+        ];
+      }
+    });
+
+    await step.run("save-rejection-tasks", async () => {
+      const tasksToCreate = newTasks.map((task) => ({
+        projectId: featureRequest.projectId,
+        prdId: prd.id,
+        title: task.title,
+        description: task.description,
+        status: "todo",
+      }));
+
+      for (const t of tasksToCreate) {
+        await prisma.task.create({ data: t });
+      }
+    });
+
+    await step.run("advance-to-planning", async () => {
+      await prisma.featureRequest.update({
+        where: { id: featureRequestId },
+        data: { status: "planning" },
+      });
+
+      const tasksListText = newTasks.map((t) => `- **${t.title}**`).join("\n");
+      await prisma.featureRequestChat.create({
+        data: {
+          featureRequestId,
+          sender: "ai",
+          message: `🔄 **PRD Refined & Tasks Updated!**\n\nI have revised the Product Requirements Document (PRD) to address the feedback: *"${reason}"*.\n\nI have also added the following new tasks to your Kanban board:\n${tasksListText}\n\nThe feature is back in the **Planning** phase. Please review the updated board and click **Approve Plan & Start Development** when you are ready to implement the changes.`,
+        },
+      });
+    });
+
+    return { status: "planning", reason: "Refined PRD and generated new tasks" };
   }
 );
 

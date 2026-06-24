@@ -100,8 +100,14 @@ export const featuresRouter = router({
         where: { id: input.featureId },
         include: {
           prd: true,
+          pullRequests: true,
           project: {
-            select: { workspaceId: true, repoFullName: true, branch: true },
+            select: {
+              workspaceId: true,
+              repoFullName: true,
+              branch: true,
+              tasks: true,
+            },
           },
         },
       });
@@ -209,5 +215,116 @@ export const featuresRouter = router({
       });
 
       return chatMessage;
+    }),
+
+  approveRelease: protectedProcedure
+    .input(z.object({ featureId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const feature = await prisma.featureRequest.findUnique({
+        where: { id: input.featureId },
+        include: {
+          project: {
+            select: { workspaceId: true },
+          },
+        },
+      });
+
+      if (!feature) {
+        throw new Error("Feature request not found");
+      }
+
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: feature.project.workspaceId,
+            userId: ctx.user.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("Unauthorized workspace access");
+      }
+
+      const updatedFeature = await prisma.featureRequest.update({
+        where: { id: input.featureId },
+        data: { status: "shipped" },
+      });
+
+      await prisma.featureRequestChat.create({
+        data: {
+          featureRequestId: input.featureId,
+          sender: "ai",
+          message: "🎉 **Release Approved!** Human reviewer has approved the release. The feature request is officially marked as **Shipped** to production!",
+        },
+      });
+
+      return updatedFeature;
+    }),
+
+  rejectRelease: protectedProcedure
+    .input(
+      z.object({
+        featureId: z.string(),
+        reason: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const feature = await prisma.featureRequest.findUnique({
+        where: { id: input.featureId },
+        include: {
+          project: {
+            select: { workspaceId: true },
+          },
+        },
+      });
+
+      if (!feature) {
+        throw new Error("Feature request not found");
+      }
+
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: feature.project.workspaceId,
+            userId: ctx.user.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("Unauthorized workspace access");
+      }
+
+      const statusToSet = input.reason ? "prd_generation" : "development";
+
+      const updatedFeature = await prisma.featureRequest.update({
+        where: { id: input.featureId },
+        data: { status: statusToSet },
+      });
+
+      const messageContent = input.reason
+        ? `🚨 **Release Rejected.** Human reviewer has rejected the release and sent it back to development.\n\n**Reason:**\n${input.reason}\n\n*AI PM is revising the PRD and generating new engineering tasks...*`
+        : `🚨 **Release Rejected.** Human reviewer has rejected the release and sent it back to development. Please review the implementation and address outstanding issues.`;
+
+      await prisma.featureRequestChat.create({
+        data: {
+          featureRequestId: input.featureId,
+          sender: "ai",
+          message: messageContent,
+        },
+      });
+
+      if (input.reason) {
+        await inngest.send({
+          name: "app/feature.release_rejected",
+          data: {
+            featureRequestId: input.featureId,
+            reason: input.reason,
+          },
+        });
+      }
+
+      return updatedFeature;
     }),
 });

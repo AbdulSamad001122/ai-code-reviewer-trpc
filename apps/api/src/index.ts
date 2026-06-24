@@ -19,11 +19,8 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      // Allow localhost, configured BETTER_AUTH_URL, Vercel previews, or dev ngrok tunnels
-      const isAllowed = 
-        allowedSet.has(origin) || 
-        origin.endsWith(".vercel.app") || 
-        origin.includes("ngrok-free.dev");
+      // Allow only configured BETTER_AUTH_URL and localhost ports strictly
+      const isAllowed = allowedSet.has(origin);
       
       if (isAllowed) {
         callback(null, true);
@@ -36,7 +33,9 @@ app.use(
 );
 app.use(express.json());
 
-
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK" });
+});
 
 app.use(
   "/trpc",

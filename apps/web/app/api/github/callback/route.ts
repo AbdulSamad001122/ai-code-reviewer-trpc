@@ -23,7 +23,14 @@ export async function GET(request: Request) {
     }
 
     if (installationId) {
-        await saveInstallation(session.user.id, Number(installationId));
+        try {
+            await saveInstallation(session.user.id, Number(installationId));
+        } catch (error) {
+            console.error("Failed to save GitHub App installation:", error);
+            const redirectUrl = new URL(DASHBOARD_ROUTES.github, request.url);
+            redirectUrl.searchParams.set("error", "installation_failed");
+            redirect(redirectUrl.pathname + redirectUrl.search);
+        }
     }
 
     redirect(DASHBOARD_ROUTES.github);

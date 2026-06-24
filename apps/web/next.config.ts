@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["felix-plectognathic-myrtice.ngrok-free.dev"],
   async rewrites() {
     return [
       {

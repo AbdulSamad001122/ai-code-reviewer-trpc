@@ -1,6 +1,25 @@
 {
     "$schema": "https://turbo.build/schemas.json",
     "ui" : "tui",
+    "globalEnv": [
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "GITHUB_CLIENT_ID",
+        "GITHUB_CLIENT_SECRET",
+        "GITHUB_APP_NAME",
+        "GITHUB_APP_ID",
+        "NEXT_PUBLIC_GITHUB_PUBLIC_LINK",
+        "GITHUB_APP_PRIVATE_KEY",
+        "GITHUB_WEBHOOK_SECRET",
+        "INNGEST_DEV",
+        "OPENROUTER_API_KEY",
+        "PINECONE_HOST",
+        "PINECONE_INDEX",
+        "PINECONE_API_KEY",
+        "BACKEND_API_URL",
+        "ENABLE_EXPERIMENTAL_COREPACK"
+    ],
     "tasks": {
         "build": {
             "dependsOn": [

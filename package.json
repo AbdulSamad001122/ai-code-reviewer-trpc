@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "inngest": "pnpm dlx inngest-cli@latest dev -u http://localhost:3000/api/inngest"
+    "inngest": "pnpm dlx inngest-cli@latest dev -u http://localhost:3000/api/inngest",
+    "postinstall": "pnpm --filter=!web --filter=!api build"
   },
   "packageManager": "pnpm@11.1.2",
   "devEngines": {

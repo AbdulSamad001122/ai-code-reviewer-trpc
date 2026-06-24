@@ -24,7 +24,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { data: workspaces = [], isLoading, refetch } = trpc.workspace.list.useQuery();
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
 
-  // Load from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem("shipflow_active_workspace_id");
     if (saved) {
@@ -32,7 +31,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Update active workspace if list changes
   useEffect(() => {
     if (workspaces.length > 0) {
       if (!activeWorkspaceId || !workspaces.some((w) => w.id === activeWorkspaceId)) {

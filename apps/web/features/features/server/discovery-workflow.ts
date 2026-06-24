@@ -30,28 +30,60 @@ type PrdResponse = {
   markdown: string;
 };
 
+async function generateTextWithRetry(systemPrompt: string, userPrompt: string): Promise<string> {
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const { text } = await generateText({
+      model: openrouter(MODEL_NAME),
+      system: systemPrompt,
+      prompt: userPrompt,
+    });
+
+    if (text.toLowerCase().includes("user safety")) {
+      console.warn(`[generateTextWithRetry] Attempt ${attempt} returned a safety classification response ("${text.trim()}"). Retrying...`);
+      if (attempt === maxRetries) {
+        return text;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      continue;
+    }
+
+    return text;
+  }
+  throw new Error("Failed to generate text due to safety response limits.");
+}
+
 async function generateJson<T>(systemPrompt: string, userPrompt: string): Promise<T> {
-  const { text } = await generateText({
-    model: openrouter(MODEL_NAME),
-    system: systemPrompt,
-    prompt: userPrompt,
-  });
+  const text = await generateTextWithRetry(systemPrompt, userPrompt);
 
   try {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
+    let cleaned = text.trim();
+    if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/^```[a-zA-Z]*\n/, "").replace(/\n```$/, "");
+    }
+
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
     if (start === -1 || end === -1) {
       throw new Error("No JSON object found in response");
     }
-    const jsonStr = text.substring(start, end + 1);
+    const jsonStr = cleaned.substring(start, end + 1);
     return JSON.parse(jsonStr) as T;
   } catch (error) {
-    console.error("Failed to parse AI response as JSON. Raw text was:", text);
-    throw new Error(`AI generated invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn("Failed first pass of JSON parsing. Attempting heuristic repair. Raw text was:", text);
+    try {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        return JSON.parse(match[0]) as T;
+      }
+    } catch (nestedError) {
+      console.error("Heuristic repair failed:", nestedError);
+    }
+    
+    throw new Error(`AI generated invalid JSON: ${error instanceof Error ? error.message : String(error)}. Raw text: ${text}`);
   }
 }
 
-// Triggered on new feature request
 export const onFeatureCreatedFunction = inngest.createFunction(
   {
     id: "on-feature-created",
@@ -60,7 +92,6 @@ export const onFeatureCreatedFunction = inngest.createFunction(
   async ({ event, step }) => {
     const { featureRequestId, projectId } = event.data;
 
-    // Get feature details
     const featureRequest = await step.run("fetch-feature-details", async () => {
       const feat = await prisma.featureRequest.findUnique({
         where: { id: featureRequestId },
@@ -70,7 +101,6 @@ export const onFeatureCreatedFunction = inngest.createFunction(
       return feat;
     });
 
-    // Check codebase for existing feature
     const codebaseSnippets = await step.run("search-codebase-vectors", async () => {
       const repoSync = await prisma.repoSync.findUnique({
         where: { repoFullName: featureRequest.project.repoFullName },
@@ -129,7 +159,6 @@ ${codebaseSnippets.join("\n\n")}`;
       return { status: "shipped", reason: "Feature already exists in codebase" };
     }
 
-    // Generate first question
     const firstQuestion = await step.run("generate-first-question", async () => {
       const systemPrompt = `You are an expert Product Manager. A user has submitted a feature request that is not yet in the codebase. Ask the first, highly targeted question to clarify missing requirements and details. Keep it conversational and friendly.
 Ask for exactly 1-2 major clarifications only (e.g. key user options, integration targets).`;
@@ -137,16 +166,10 @@ Ask for exactly 1-2 major clarifications only (e.g. key user options, integratio
       const userPrompt = `Feature Request: ${featureRequest.title}
 Description: ${featureRequest.description}`;
 
-      const { text } = await generateText({
-        model: openrouter(MODEL_NAME),
-        system: systemPrompt,
-        prompt: userPrompt,
-      });
-
+      const text = await generateTextWithRetry(systemPrompt, userPrompt);
       return text;
     });
 
-    // Save question to chat
     await step.run("save-first-question", async () => {
       await prisma.featureRequestChat.create({
         data: {
@@ -161,7 +184,6 @@ Description: ${featureRequest.description}`;
   }
 );
 
-// Triggered on feature chat response
 export const onFeatureChatReceivedFunction = inngest.createFunction(
   {
     id: "on-feature-chat-received",
@@ -170,7 +192,6 @@ export const onFeatureChatReceivedFunction = inngest.createFunction(
   async ({ event, step }) => {
     const { featureRequestId } = event.data;
 
-    // Get chat logs
     const { featureRequest, chatLogs } = await step.run("fetch-chat-context", async () => {
       const feat = await prisma.featureRequest.findUnique({
         where: { id: featureRequestId },
@@ -190,7 +211,6 @@ export const onFeatureChatReceivedFunction = inngest.createFunction(
       return { featureRequest: feat, chatLogs: formattedLogs };
     });
 
-    // Verify requirements
     const checkResult = await step.run("check-requirements-sufficiency", async () => {
       const systemPrompt = `You are a Senior Product Manager. Your task is to analyze a feature request and the requirements discussion history, and decide if you have enough clear, detailed information to compile a structured Product Requirements Document (PRD).
 You must reply ONLY with a JSON object in this format:
@@ -211,7 +231,6 @@ Does this give you enough detail to write the PRD? If not, what is the next sing
     });
 
     if (!checkResult.sufficient) {
-      // Ask next question
       const nextQuestion = checkResult.nextQuestion || "Can you clarify the primary user flows for this feature?";
       await step.run("save-next-question", async () => {
         await prisma.featureRequestChat.create({
@@ -226,7 +245,6 @@ Does this give you enough detail to write the PRD? If not, what is the next sing
       return { status: "discovery", reason: "Asked next question" };
     }
 
-    // Update status to generating
     await step.run("update-status-generating", async () => {
       await prisma.featureRequest.update({
         where: { id: featureRequestId },
@@ -242,13 +260,11 @@ Does this give you enough detail to write the PRD? If not, what is the next sing
       });
     });
 
-    // Search codebase
     const codebaseSnippets = await step.run("search-codebase-for-prd", async () => {
       const repoNamespace = buildRepoNamespace(featureRequest.project.repoFullName);
       return searchPrContext(repoNamespace, `${featureRequest.title} ${featureRequest.description}`);
     });
 
-    // Compile PRD
     const prdData = await step.run("compile-prd", async () => {
       const systemPrompt = `You are a Senior Product Manager. Your task is to generate a comprehensive Product Requirements Document (PRD) for the requested feature based on the requirements chat logs and the repository codebase context.
 You must reply ONLY with a JSON object in this format:
@@ -274,7 +290,6 @@ ${codebaseSnippets.join("\n\n")}`;
       return generateJson<PrdResponse>(systemPrompt, userPrompt);
     });
 
-    // Save PRD
     const prd = await step.run("save-prd-and-advance", async () => {
       const prdObj = await prisma.pRD.create({
         data: {
@@ -306,7 +321,6 @@ ${codebaseSnippets.join("\n\n")}`;
       return prdObj;
     });
 
-    // Generate board tasks
     const tasks = await step.run("generate-engineering-tasks", async () => {
       const systemPrompt = `You are a Technical Lead. Your task is to break down a Product Requirements Document (PRD) into a list of actionable, technical engineering tasks.
 You must reply ONLY with a JSON array in this format:
@@ -326,11 +340,7 @@ ${prdData.acceptanceCriteria.map((ac) => `- ${ac}`).join("\n")}
 
 Break this down into 3-6 clear, actionable development tasks (e.g. backend api creation, frontend ui card implementation, integration steps).`;
 
-      const { text } = await generateText({
-        model: openrouter(MODEL_NAME),
-        system: systemPrompt,
-        prompt: userPrompt,
-      });
+      const text = await generateTextWithRetry(systemPrompt, userPrompt);
 
       try {
         const start = text.indexOf("[");
@@ -355,7 +365,6 @@ Break this down into 3-6 clear, actionable development tasks (e.g. backend api c
       }
     });
 
-    // Save engineering tasks
     await step.run("save-engineering-tasks", async () => {
       const tasksToCreate = tasks.map((task) => ({
         projectId: featureRequest.projectId,

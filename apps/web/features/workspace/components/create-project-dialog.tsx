@@ -26,10 +26,8 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
 
   const { activeWorkspace } = useWorkspace();
 
-  // Fetch GitHub installation status to ensure they are connected
   const { data: installStatus } = trpc.github.getInstallationStatus.useQuery();
 
-  // Fetch repositories for linking
   const { data: reposData, isLoading: isLoadingRepos } = trpc.github.getRepos.useQuery(
     { page: 1 },
     { enabled: !!installStatus?.connected && open }
@@ -133,7 +131,6 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
                     value={repoFullName}
                     onChange={(e) => {
                       setRepoFullName(e.target.value);
-                      // Default project name to repo name if empty
                       if (!name) {
                         const parts = e.target.value.split("/");
                         setName(parts[parts.length - 1] || "");

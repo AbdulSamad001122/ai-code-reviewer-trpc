@@ -25,7 +25,7 @@ function getKeywords(title: string): string[] {
     .toLowerCase()
     .replace(/[^\w\s-]/g, "")
     .split(/[\s_-]+/)
-    .filter((w) => w.length > 3); // Remove short words/verbs like 'add', 'the', 'for'
+    .filter((w) => w.length > 3);
   return Array.from(new Set(words));
 }
 
@@ -65,7 +65,6 @@ async function findMatchingFeatureRequest(
   const normalizedTitle = prTitle.toLowerCase();
   const normalizedBody = prBody ? prBody.toLowerCase() : "";
 
-  // 1. Direct ID matches
   for (const feature of activeFeatures) {
     const idLower = feature.id.toLowerCase();
     if (
@@ -77,7 +76,6 @@ async function findMatchingFeatureRequest(
     }
   }
 
-  // 2. Slugified title matches in branch or title
   for (const feature of activeFeatures) {
     const featureSlug = slugify(feature.title);
     if (featureSlug && (normalizedBranch.includes(featureSlug) || normalizedTitle.includes(featureSlug))) {
@@ -85,7 +83,6 @@ async function findMatchingFeatureRequest(
     }
   }
 
-  // 3. Keyword token-based matches in branch, title, or body
   for (const feature of activeFeatures) {
     const keywords = getKeywords(feature.title);
     if (
@@ -97,7 +94,6 @@ async function findMatchingFeatureRequest(
     }
   }
 
-  // 4. Fallback: If only one active feature is in development, link it
   const devFeatures = activeFeatures.filter((f) => f.status === "development");
   if (devFeatures.length === 1) {
     return devFeatures[0].id;

@@ -9,7 +9,6 @@ export const featuresRouter = router({
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Validate workspace membership through project
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
         select: { workspaceId: true },
@@ -51,7 +50,6 @@ export const featuresRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Validate workspace membership through project
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
         select: { workspaceId: true },
@@ -84,7 +82,6 @@ export const featuresRouter = router({
         },
       });
 
-      // Send event to Inngest to run background AI checking and first clarifying question
       await inngest.send({
         name: "app/feature.created",
         data: {
@@ -196,7 +193,6 @@ export const featuresRouter = router({
         throw new Error("Unauthorized workspace access");
       }
 
-      // 1. Log the user's message
       const chatMessage = await prisma.featureRequestChat.create({
         data: {
           featureRequestId: input.featureId,
@@ -205,7 +201,6 @@ export const featuresRouter = router({
         },
       });
 
-      // 2. Trigger Inngest to let the AI process it and respond
       await inngest.send({
         name: "app/feature.chat_received",
         data: {

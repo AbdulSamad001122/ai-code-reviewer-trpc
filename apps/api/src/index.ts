@@ -10,7 +10,6 @@ const app = express();
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow any origin in development to support tunnels like ngrok
       callback(null, true);
     },
     credentials: true,

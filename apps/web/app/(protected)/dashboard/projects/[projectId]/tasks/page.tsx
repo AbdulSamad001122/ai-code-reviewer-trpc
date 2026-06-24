@@ -23,6 +23,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Plus,
@@ -34,7 +35,18 @@ import {
   DotsThreeOutlineVertical,
   Warning,
   Play,
+  Trash,
 } from "@phosphor-icons/react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -53,25 +65,22 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedPrdId, setSelectedPrdId] = useState<string>("none");
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
-  // Fetch project details
   const { data: project, isLoading: isLoadingProject } = trpc.project.get.useQuery({ projectId });
 
-  // Fetch features
   const {
     data: features = [],
     isLoading: isLoadingFeatures,
     refetch: refetchFeatures,
   } = trpc.features.list.useQuery({ projectId });
 
-  // Fetch tasks
   const {
     data: tasks = [],
     isLoading: isLoadingTasks,
     refetch: refetchTasks,
   } = trpc.tasks.list.useQuery({ projectId });
 
-  // Create task mutation
   const createTaskMutation = trpc.tasks.create.useMutation({
     onSuccess: () => {
       setOpen(false);
@@ -82,14 +91,22 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
     },
   });
 
-  // Update status mutation
   const updateStatusMutation = trpc.tasks.updateStatus.useMutation({
     onSuccess: () => {
       refetchTasks();
     },
   });
 
-  // Approve plan mutation
+  const deleteTaskMutation = trpc.tasks.delete.useMutation({
+    onSuccess: () => {
+      refetchTasks();
+    },
+  });
+
+  const handleDeleteTask = (taskId: string) => {
+    setDeleteTaskId(taskId);
+  };
+
   const approvePlanMutation = trpc.tasks.approvePlan.useMutation({
     onSuccess: () => {
       refetchFeatures();
@@ -97,10 +114,8 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
     },
   });
 
-  // Filter features that are in the planning stage
   const planningFeatures = features.filter((f) => f.status === "planning");
 
-  // Features available for linking (must have a PRD generated)
   const prdLinkedFeatures = features.filter((f) => f.prd !== null && f.prd !== undefined);
 
   const handleCreateTask = (e: React.FormEvent) => {
@@ -168,7 +183,6 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <Link
@@ -286,7 +300,6 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
         </Dialog>
       </div>
 
-      {/* Planning Stage Banner Alert */}
       {planningFeatures.length > 0 && (
         <div className="flex flex-col gap-4">
           {planningFeatures.map((feature) => (
@@ -316,7 +329,6 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
         </div>
       )}
 
-      {/* Kanban Board Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 items-start">
         {columns.map((column) => {
           const columnTasks = tasks.filter((t) => t.status === column.id);
@@ -326,7 +338,6 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
               key={column.id}
               className={`rounded-xl border border-border border-t-2 ${column.color} flex flex-col p-4 gap-4 min-h-[500px] shadow-xs`}
             >
-              {/* Column Header */}
               <div className="flex items-center justify-between border-b border-border/50 pb-2">
                 <div className="flex items-center gap-2">
                   {column.icon}
@@ -339,7 +350,6 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                 </Badge>
               </div>
 
-              {/* Task Cards List */}
               <div className="flex flex-col gap-3 overflow-y-auto max-h-[600px] pr-1">
                 {columnTasks.length === 0 ? (
                   <div className="text-center py-12 text-xs text-muted-foreground/60 border border-dashed border-border/40 rounded-lg bg-card/10 select-none">
@@ -347,7 +357,6 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                   </div>
                 ) : (
                   columnTasks.map((task) => {
-                    // Match task to feature request via prd relation if exists
                     const matchedFeature = features.find((f) => f.prd?.id === task.prdId);
 
                     return (
@@ -371,7 +380,6 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                             )}
                           </div>
 
-                          {/* Quick Action Transition Menu */}
                           <DropdownMenu>
                             <DropdownMenuTrigger
                               render={
@@ -421,6 +429,15 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                                   Move to Done
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteTask(task.id)}
+                                variant="destructive"
+                                className="cursor-pointer gap-1.5 text-destructive"
+                              >
+                                <Trash className="size-3.5" />
+                                Delete Task
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </CardHeader>
@@ -443,6 +460,31 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
           );
         })}
       </div>
+
+      <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the task from the Kanban board.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTaskId) {
+                  deleteTaskMutation.mutate({ taskId: deleteTaskId });
+                  setDeleteTaskId(null);
+                }
+              }}
+              variant="destructive"
+            >
+              Yes, delete task
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

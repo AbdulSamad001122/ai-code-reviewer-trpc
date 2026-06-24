@@ -8,13 +8,11 @@ import { buildPrNamespace, saveChunksToPinecone, searchPrContext } from "./vecto
 import { buildRepoNamespace } from "@/features/repo-sync/server/repo-sync";
 
 
-// Trigger AI review on new PR
 export const reviewPullRequest = inngest.createFunction(
     { id: "review-pull-request", triggers: { event: "github/pr.received" } },
     async ({ event, step }) => {
       const pullRequestId = event.data.pullRequestId;
   
-      // Update status to processing
       const pullRequest = await step.run("mark-processing", async () => {
         return prisma.pullRequest.update({
           where: { id: pullRequestId },
@@ -22,7 +20,6 @@ export const reviewPullRequest = inngest.createFunction(
         });
       });
   
-      // Chunk files for analysis
       const chunks = await step.run("breakdown-code", async () => {
         const files = await getPullRequestFiles(
           pullRequest.installationId,
@@ -32,8 +29,6 @@ export const reviewPullRequest = inngest.createFunction(
   
         return chunkPrFiles(pullRequest.prNumber, files);
       });
-  
-      // Handle empty PR
       if (chunks.length === 0) {
         await step.run("mark-reviewed-no-code", async () => {
           await prisma.pullRequest.update({
@@ -50,14 +45,11 @@ export const reviewPullRequest = inngest.createFunction(
         pullRequest.prNumber
       );
   
-      // Index chunks in Pinecone
       await step.run("save-vectors-to-pinecone", async () => {
         await saveChunksToPinecone(namespace, chunks);
       });
   
       await step.sleep("wait-for-vectors-to-index", "10s");
-  
-      // Fetch codebase references
       const repoContextSnippets = await step.run("search-repo-context", async () => {
         const repoSync = await prisma.repoSync.findUnique({
           where: { repoFullName: pullRequest.repoFullName },
@@ -71,7 +63,6 @@ export const reviewPullRequest = inngest.createFunction(
         return searchPrContext(repoNamespace, pullRequest.title);
       });
   
-      // Fetch requirements context
       const prdContext = await step.run("fetch-prd-context", async () => {
         if (pullRequest.featureRequestId) {
           const feature = await prisma.featureRequest.findUnique({
@@ -104,7 +95,6 @@ export const reviewPullRequest = inngest.createFunction(
           }
         }
 
-        // Search for active feature request if not explicitly linked
         const project = await prisma.project.findFirst({
           where: { repoFullName: pullRequest.repoFullName },
         });
@@ -146,7 +136,6 @@ export const reviewPullRequest = inngest.createFunction(
         return null;
       });
 
-      // Run AI review
       const review = await step.run("generate-ai-review", async () => {
         const contextSnippets = await searchPrContext(
           namespace,
@@ -164,7 +153,6 @@ export const reviewPullRequest = inngest.createFunction(
         });
       });
 
-      // Sync task board states
       const { cleanReview } = await step.run("parse-and-apply-task-updates", async () => {
         const match = review.match(/\[TASK_UPDATES\]([\s\S]*?)\[\/TASK_UPDATES\]/);
         const clean = review.replace(/\[TASK_UPDATES\][\s\S]*?\[\/TASK_UPDATES\]/, "").trim();
@@ -187,7 +175,6 @@ export const reviewPullRequest = inngest.createFunction(
         return { cleanReview: clean };
       });
   
-      // Publish GitHub review comments
       await step.run("post-pr-comment", async () => {
         await postPrComment(
           pullRequest.installationId,
@@ -197,7 +184,6 @@ export const reviewPullRequest = inngest.createFunction(
         );
       });
   
-      // Finalize PR state
       const resultStatus = await step.run("mark-reviewed", async () => {
         const isBlocking = cleanReview.includes("REQUEST CHANGES") || cleanReview.includes("[BLOCKING]");
         const prStatus = isBlocking ? "fix_needed" : "reviewed";

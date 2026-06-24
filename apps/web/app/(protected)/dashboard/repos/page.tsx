@@ -30,11 +30,6 @@ function ReposNotConnected() {
   );
 }
 
-/**
- * Repositories list page with GitHub connection guard.
- *
- * @returns Header plus either connect prompt or interactive repo table.
- */
 export default async function DashboardReposPage() {
   const session = await requireAuth();
   const installation = await getInstallationStatus(session.user.id);

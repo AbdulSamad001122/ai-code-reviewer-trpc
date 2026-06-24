@@ -31,7 +31,6 @@ export async function saveChunksToPinecone(
 
         await index.namespace(namespace).upsertRecords({ records });
 
-        // Add a 5-second sleep to avoid hitting Pinecone serverless embedding token rate limits
         if (start + BATCH_SIZE < validChunks.length) {
             await new Promise((resolve) => setTimeout(resolve, 5000));
         }

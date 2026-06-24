@@ -6,6 +6,12 @@ export async function postPrComment(
     prNumber: number,
     body: string
 ) {
+    const trimmed = body.trim();
+    if (!trimmed) {
+        console.warn("[postPrComment] Skipping comment creation because the body is empty.");
+        return;
+    }
+
     const app = getGithubApp();
     const octokit = await app.getInstallationOctokit(installationId);
     const [owner, repo] = repoFullName.split("/");
@@ -14,6 +20,6 @@ export async function postPrComment(
         owner,
         repo,
         issue_number: prNumber,
-        body,
+        body: trimmed,
     });
 }

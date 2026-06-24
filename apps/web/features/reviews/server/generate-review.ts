@@ -114,7 +114,9 @@ Provide a brief summary statement of the review findings.
 
 ## ⚙️ Kanban Task Transitions
 
-At the very end of your review output, you MUST include a structured JSON block updating the status of the planned engineering tasks based on the code changes:
+Under this section, you MUST first write a clear, human-readable bulleted list summarizing the status transitions for the planned engineering tasks (e.g., "* **Create Contact Form UI** (ID: \`cmqqllxoo0000k03s5ltusb8r\`) was transitioned to **In Review**"). If no tasks are transitioned, explicitly state that no task transitions occurred.
+
+Below the human-readable summary, you MUST include a structured JSON block updating the status of the planned engineering tasks based on the code changes:
 - Evaluate each task ID provided in the PLANNED ENGINEERING TASKS section against the code changes.
 - Transition status to "review" if the task's implementation is fully complete in the diff.
 - Transition status to "in_progress" if code changes implementing the task have started but are not yet complete.
@@ -200,19 +202,33 @@ ${input.tasks.map((t) => `- [ID: ${t.id}] [${t.status.toUpperCase()}] ${t.title}
 `;
   }
 
-  const { text } = await generateText({
-    model: openrouter(REVIEW_MODEL),
-    system: SYSTEM_PROMPT,
-    prompt: `Repository: ${input.repoFullName}
-  Pull request title: ${input.title}
-  Is linked to a feature request: ${input.isLinkedToFeature}
-  ${prdContext}
-  ${tasksContext}
-  
-  Code changes:
-  
-  ${context}${repoContextSection}`,
-  });
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const { text } = await generateText({
+      model: openrouter(REVIEW_MODEL),
+      system: SYSTEM_PROMPT,
+      prompt: `Repository: ${input.repoFullName}
+    Pull request title: ${input.title}
+    Is linked to a feature request: ${input.isLinkedToFeature}
+    ${prdContext}
+    ${tasksContext}
+    
+    Code changes:
+    
+    ${context}${repoContextSection}`,
+    });
 
-  return text;
+    if (text.toLowerCase().includes("user safety")) {
+      console.warn(`[generateReview] Attempt ${attempt} returned a safety classification response ("${text.trim()}"). Retrying...`);
+      if (attempt === maxRetries) {
+        return text;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      continue;
+    }
+
+    return text;
+  }
+
+  throw new Error("Failed to generate review due to safety response limits.");
 }

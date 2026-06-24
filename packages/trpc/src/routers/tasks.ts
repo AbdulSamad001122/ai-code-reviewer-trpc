@@ -6,7 +6,6 @@ export const tasksRouter = router({
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Validate project access
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
         select: { workspaceId: true },
@@ -47,7 +46,6 @@ export const tasksRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Validate project access
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
         select: { workspaceId: true },
@@ -125,6 +123,42 @@ export const tasksRouter = router({
       return updatedTask;
     }),
 
+  delete: protectedProcedure
+    .input(z.object({ taskId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const task = await prisma.task.findUnique({
+        where: { id: input.taskId },
+        include: {
+          project: {
+            select: { workspaceId: true },
+          },
+        },
+      });
+
+      if (!task) {
+        throw new Error("Task not found");
+      }
+
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: task.project.workspaceId,
+            userId: ctx.user.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("Unauthorized workspace access");
+      }
+
+      const deletedTask = await prisma.task.delete({
+        where: { id: input.taskId },
+      });
+
+      return deletedTask;
+    }),
+
   approvePlan: protectedProcedure
     .input(z.object({ featureId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -163,7 +197,6 @@ export const tasksRouter = router({
         data: { status: "development" },
       });
 
-      // Log an AI status message in the chat
       await prisma.featureRequestChat.create({
         data: {
           featureRequestId: input.featureId,

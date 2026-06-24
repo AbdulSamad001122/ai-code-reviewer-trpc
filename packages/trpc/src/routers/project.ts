@@ -6,7 +6,6 @@ export const projectRouter = router({
   list: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Validate workspace membership
       const membership = await prisma.workspaceMember.findUnique({
         where: {
           workspaceId_userId: {
@@ -39,7 +38,6 @@ export const projectRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Validate workspace membership
       const membership = await prisma.workspaceMember.findUnique({
         where: {
           workspaceId_userId: {

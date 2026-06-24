@@ -18,7 +18,8 @@ export function getGithubApp(){
 }
 
 export function getGithubInstallUrl(userId: string) {
-    const url = new URL(`https://github.com/apps/parrot-code-reviewer/installations/new`);
+    const baseLink = process.env.NEXT_PUBLIC_GITHUB_PUBLIC_LINK || "https://github.com/apps/parrot-code-reviewer";
+    const url = new URL(`${baseLink.replace(/\/$/, "")}/installations/new`);
     url.searchParams.set("state", userId);
     return url.toString();
   }

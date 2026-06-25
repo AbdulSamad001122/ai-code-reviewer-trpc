@@ -131,6 +131,10 @@ function ChatMessageRenderer({ content, isUser }: { content: string; isUser: boo
   );
 }
 
+
+
+
+
 export default function FeatureDetailPage({
   params,
 }: {
@@ -140,6 +144,7 @@ export default function FeatureDetailPage({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("chat");
   const [message, setMessage] = useState("");
+  const [isSkippingSingle, setIsSkippingSingle] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -166,13 +171,22 @@ export default function FeatureDetailPage({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (!message.trim() || sendMessageMutation.isPending) {
+      if (sendMessageMutation.isPending) {
         return;
       }
-      sendMessageMutation.mutate({
-        featureId,
-        message,
-      });
+      if (isSkippingSingle) {
+        sendMessageMutation.mutate({
+          featureId,
+          message: `[Skip Single Question] ${message.trim() ? "Reason: " + message.trim() : "User declined to answer."}`,
+        });
+        setIsSkippingSingle(false);
+      } else {
+        if (!message.trim()) return;
+        sendMessageMutation.mutate({
+          featureId,
+          message,
+        });
+      }
     }
   };
 
@@ -209,13 +223,22 @@ export default function FeatureDetailPage({
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || sendMessageMutation.isPending) {
+    if (sendMessageMutation.isPending) {
       return;
     }
-    sendMessageMutation.mutate({
-      featureId,
-      message,
-    });
+    if (isSkippingSingle) {
+      sendMessageMutation.mutate({
+        featureId,
+        message: `[Skip Single Question] ${message.trim() ? "Reason: " + message.trim() : "User declined to answer."}`,
+      });
+      setIsSkippingSingle(false);
+    } else {
+      if (!message.trim()) return;
+      sendMessageMutation.mutate({
+        featureId,
+        message,
+      });
+    }
   };
 
   const [rejectReason, setRejectReason] = useState("");
@@ -292,6 +315,9 @@ export default function FeatureDetailPage({
 
   const isFirstQuestionLoading = isDiscovery && chats.length === 0;
   const showTypingIndicator = isAiTyping || sendMessageMutation.isPending || isFirstQuestionLoading;
+
+
+
 
   const featureTasks = (feature as any).project?.tasks?.filter((t: any) => t.prdId === feature.prd?.id) || [];
   const completedTasksCount = featureTasks.filter((t: any) => t.status === "done" || t.status === "review").length;
@@ -704,22 +730,29 @@ export default function FeatureDetailPage({
 
                   {isDiscovery && (
                     <div className="border-t border-border p-4 bg-muted/10 flex flex-col gap-3">
+                      {isSkippingSingle && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-xs text-amber-500 font-semibold animate-in fade-in duration-200">
+                          <Warning className="size-3.5 shrink-0" />
+                          <span>Skipping Current Question. Enter an optional reason below or click send to skip without a reason.</span>
+                        </div>
+                      )}
+                      
                       <form onSubmit={handleSendMessage} className="flex gap-2 items-end">
                         <Textarea
                           ref={textareaRef}
-                          placeholder="Type your response to clarify details…"
+                          placeholder={isSkippingSingle ? "Why are you skipping? (Optional, e.g. 'declining to share API key')..." : "Type your response to clarify details…"}
                           value={message}
                           onChange={(e) => setMessage(e.target.value)}
                           onKeyDown={handleKeyDown}
                           disabled={sendMessageMutation.isPending}
-                          required
+                          required={!isSkippingSingle}
                           rows={1}
                           className="border-border bg-background focus-visible:ring-primary flex-1 min-h-[40px] max-h-[160px] py-2 px-3 resize-none rounded-xl align-bottom"
                         />
                         <Button
                           type="submit"
                           size="icon"
-                          disabled={!message.trim() || sendMessageMutation.isPending}
+                          disabled={(!isSkippingSingle && !message.trim()) || sendMessageMutation.isPending}
                           className="cursor-pointer bg-primary text-primary-foreground"
                         >
                           {sendMessageMutation.isPending ? (
@@ -729,18 +762,49 @@ export default function FeatureDetailPage({
                           )}
                         </Button>
                       </form>
+                      
                       <div className="flex justify-between items-center text-xs text-muted-foreground px-1">
-                        <span>AI PM is waiting for details.</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleSkipQuestion}
-                          disabled={sendMessageMutation.isPending}
-                          className="cursor-pointer text-xs text-primary hover:text-primary/80 hover:bg-transparent h-fit p-0 font-semibold flex items-center gap-1"
-                        >
-                          Skip Question & Compile PRD ➡️
-                        </Button>
+                        {isSkippingSingle ? (
+                          <>
+                            <span>Optionally clarify the skip reason.</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsSkippingSingle(false);
+                                setMessage("");
+                              }}
+                              className="cursor-pointer text-xs text-muted-foreground hover:text-foreground font-semibold"
+                            >
+                              Cancel Skip
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span>AI PM is waiting for details.</span>
+                            <div className="flex items-center gap-4">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsSkippingSingle(true);
+                                  setMessage("");
+                                }}
+                                className="cursor-pointer text-xs text-amber-500 hover:text-amber-400 font-semibold transition-colors flex items-center gap-1"
+                              >
+                                Skip Current Question ➡️
+                              </button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleSkipQuestion}
+                                disabled={sendMessageMutation.isPending}
+                                className="cursor-pointer text-xs text-primary hover:text-primary/80 hover:bg-transparent h-fit p-0 font-semibold flex items-center gap-1"
+                              >
+                                Compile PRD Now ➡️
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}

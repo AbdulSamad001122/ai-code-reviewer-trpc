@@ -213,7 +213,13 @@ export const onFeatureChatReceivedFunction = inngest.createFunction(
 
     const checkResult = await step.run("check-requirements-sufficiency", async () => {
       const systemPrompt = `You are a Senior Product Manager. Your task is to analyze a feature request and the requirements discussion history, and decide if you have enough clear, detailed information to compile a structured Product Requirements Document (PRD).
-* CRITICAL RULE: If the user explicitly chose to skip a question, bypass it, or requests to proceed and compile the PRD now, you MUST set "sufficient" to true immediately. Do not ask another question.
+* CRITICAL RULE: If the user explicitly chose to skip the entire chat, requests to proceed, or requests to compile the PRD now (e.g. text starts with "[Skip Question]" or "[Compile PRD Now]"), you MUST set "sufficient" to true immediately. Do not ask another question.
+* CRITICAL RULE: If the user chose to skip a single question (e.g. text starts with "[Skip Single Question]"), do NOT mark requirements as sufficient immediately unless you have everything else you need. Instead:
+  1. Respect the user's decision to skip that specific question (e.g., they don't want to provide sensitive credentials, API keys, or specific details).
+  2. Make a reasonable, standard default assumption for that skipped requirement.
+  3. Move on to check sufficiency of the remaining requirements or ask the next question.
+  4. DO NOT ask the same question or repeat the topic of the skipped question.
+* CRITICAL RULE: Under no circumstances should you repeat a question or ask about a topic that the user has already answered, dismissed, or skipped. If the user indicates they "already told you", "don't want to use it", or are dismissive, you must set "sufficient" to true or ask a completely different, unrelated question. Do not get stuck in a loop.
 You must reply ONLY with a JSON object in this format:
 {
   "sufficient": boolean,

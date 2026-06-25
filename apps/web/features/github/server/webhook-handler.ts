@@ -50,7 +50,13 @@ export async function handleGithubWebhook(request:Request) {
     
     // Filter out commits made by the GitHub app itself to prevent feedback loops
     const pusherName = event.pusher?.name || "";
-    if (pusherName.includes("shipflow") || pusherName.includes("parrot-code-reviewer") || event.sender?.login?.includes("shipflow")) {
+    if (
+      pusherName.includes("shipflow") || 
+      pusherName.includes("theship") || 
+      pusherName.includes("parrot-code-reviewer") || 
+      event.sender?.login?.includes("shipflow") || 
+      event.sender?.login?.includes("theship")
+    ) {
       return Response.json({ received: true, ignored: true, reason: "Self commit" });
     }
 

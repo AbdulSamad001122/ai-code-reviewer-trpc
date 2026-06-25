@@ -11,8 +11,8 @@ export function CreateWorkspaceOverlay() {
   const [name, setName] = useState("");
   const { refetchWorkspaces } = useWorkspace();
   const createWorkspaceMutation = trpc.workspace.create.useMutation({
-    onSuccess: () => {
-      refetchWorkspaces();
+    onSuccess: async () => {
+      await refetchWorkspaces();
     },
   });
 
@@ -31,7 +31,7 @@ export function CreateWorkspaceOverlay() {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold tracking-tight">Create Workspace</CardTitle>
             <CardDescription>
-              Every project and feature request in ShipFlow AI belongs to a workspace. Set up your workspace to get started.
+              Every project and feature request in TheShip AI belongs to a workspace. Set up your workspace to get started.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 py-4">

@@ -50,16 +50,16 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
   );
 
   const createProjectMutation = trpc.project.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      if (onProjectCreated) {
+        await onProjectCreated();
+      }
       setOpen(false);
       setName("");
       setDescription("");
       setRepoFullName("");
       setBranch("main");
       setRepoSearch("");
-      if (onProjectCreated) {
-        onProjectCreated();
-      }
     },
   });
 

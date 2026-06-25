@@ -83,24 +83,24 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
   } = trpc.tasks.list.useQuery({ projectId });
 
   const createTaskMutation = trpc.tasks.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refetchTasks();
       setOpen(false);
       setTitle("");
       setDescription("");
       setSelectedPrdId("none");
-      refetchTasks();
     },
   });
 
   const updateStatusMutation = trpc.tasks.updateStatus.useMutation({
-    onSuccess: () => {
-      refetchTasks();
+    onSuccess: async () => {
+      await refetchTasks();
     },
   });
 
   const deleteTaskMutation = trpc.tasks.delete.useMutation({
-    onSuccess: () => {
-      refetchTasks();
+    onSuccess: async () => {
+      await refetchTasks();
       setDeleteTaskId(null);
     },
   });
@@ -110,9 +110,8 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
   };
 
   const approvePlanMutation = trpc.tasks.approvePlan.useMutation({
-    onSuccess: () => {
-      refetchFeatures();
-      refetchTasks();
+    onSuccess: async () => {
+      await Promise.all([refetchFeatures(), refetchTasks()]);
     },
   });
 

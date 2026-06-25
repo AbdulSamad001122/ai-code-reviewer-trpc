@@ -236,10 +236,10 @@ export default function LandingPage() {
         <nav className="relative mx-auto flex h-20 max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-[#D7FFA4] text-[#0F2124] font-black text-lg shadow-[0_0_15px_rgba(215,255,164,0.3)]">
-              S
+              T
             </div>
             <span className="text-xl font-extrabold tracking-tight text-white">
-              ShipFlow<span className="text-[#D7FFA4]">.ai</span>
+              TheShip<span className="text-[#D7FFA4]">.ai</span>
             </span>
           </div>
 
@@ -294,7 +294,7 @@ export default function LandingPage() {
           {/* Right Description & Action Block */}
           <div className="space-y-5 lg:pt-3">
             <p className="text-sm sm:text-base text-white/60 leading-relaxed max-w-md">
-              ShipFlow normalizes engineering delivery into a single automated pipeline. Calibrated to expert reviews, structured task validation, and DORA metrics, not line counts.
+              TheShip normalizes engineering delivery into a single automated pipeline. Calibrated to expert reviews, structured task validation, and DORA metrics, not line counts.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <button
@@ -469,7 +469,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Unique Winking Developer Mascot (Cute robot parrot for ShipFlow) */}
+          {/* Unique Winking Developer Mascot (Cute robot parrot for TheShip) */}
           <div className="w-48 h-48 shrink-0 flex items-center justify-center animate-mascot relative">
             {/* Small glowing circle behind mascot */}
             <div className="absolute inset-0 bg-[#D7FFA4]/10 rounded-full blur-2xl pointer-events-none" />
@@ -526,7 +526,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-[#D7FFA4]">Interactive Playground</p>
-            <h2 className="text-3xl sm:text-4xl font-bold mt-2">See how ShipFlow AI builds your software</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold mt-2">See how TheShip AI builds your software</h2>
             <p className="text-sm text-white/50 mt-3">Click through the steps of the feature delivery cycle below.</p>
           </div>
 
@@ -575,11 +575,11 @@ export default function LandingPage() {
                   <div className="size-3 rounded-full bg-green-500/20 border border-green-500/30" />
                 </div>
                 <div className="text-[10px] font-mono text-white/30 ml-4 max-w-sm truncate bg-[#0A1A1B] px-3 py-1 rounded border border-white/5">
-                  {activeTab === "discovery" && "shipflow.ai/dashboard/project/feature-discovery"}
-                  {activeTab === "prd" && "shipflow.ai/dashboard/project/features/prd_spec"}
-                  {activeTab === "kanban" && "shipflow.ai/dashboard/project/kanban-board"}
-                  {activeTab === "review" && "github.com/shipflow-ai/app/pull/42"}
-                  {activeTab === "release" && "shipflow.ai/dashboard/release-center"}
+                  {activeTab === "discovery" && "theship.ai/dashboard/project/feature-discovery"}
+                  {activeTab === "prd" && "theship.ai/dashboard/project/features/prd_spec"}
+                  {activeTab === "kanban" && "theship.ai/dashboard/project/kanban-board"}
+                  {activeTab === "review" && "github.com/theship-ai/app/pull/42"}
+                  {activeTab === "release" && "theship.ai/dashboard/release-center"}
                 </div>
               </div>
 
@@ -1123,7 +1123,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-6 text-center space-y-6">
           <h2 className="text-2xl sm:text-3xl font-bold">Start shipping with AI today</h2>
           <p className="text-sm text-white/50 max-w-md mx-auto">
-            Integrate ShipFlow AI into your GitHub organization and speed up your delivery cycle.
+            Integrate TheShip AI into your GitHub organization and speed up your delivery cycle.
           </p>
           <div className="pt-2">
             <button
@@ -1134,7 +1134,7 @@ export default function LandingPage() {
             </button>
           </div>
           <p className="text-[10px] text-white/30 pt-8">
-            © {new Date().getFullYear()} ShipFlow AI. All rights reserved.
+            © {new Date().getFullYear()} TheShip AI. All rights reserved.
           </p>
         </div>
       </footer>

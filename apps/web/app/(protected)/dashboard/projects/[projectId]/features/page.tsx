@@ -64,11 +64,11 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
   } = trpc.features.list.useQuery({ projectId });
 
   const createFeatureMutation = trpc.features.create.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refetchFeatures();
       setOpen(false);
       setTitle("");
       setDescription("");
-      refetchFeatures();
     },
   });
 
@@ -77,9 +77,9 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
   const [selectedFeatureTitle, setSelectedFeatureTitle] = useState("");
 
   const deleteFeatureMutation = trpc.features.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refetchFeatures();
       setShowDeleteDialog(false);
-      refetchFeatures();
     },
   });
 
@@ -314,7 +314,7 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
               <br />
               1. Permanently delete the feature request, its PRD, chat messages, and Kanban board tasks.
               <br />
-              2. Delete the associated specifications folder <code className="bg-muted px-1 py-0.5 rounded text-xs">.shipflow/features/{selectedFeatureTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")}</code> from your GitHub repository.
+              2. Delete the associated specifications folder <code className="bg-muted px-1 py-0.5 rounded text-xs">.theship/features/{selectedFeatureTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")}</code> from your GitHub repository.
               <br /><br />
               This action cannot be undone.
             </DialogDescription>

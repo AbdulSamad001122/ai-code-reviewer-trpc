@@ -33,7 +33,6 @@ export const deleteFeatureGitFunction = inngest.createFunction(
       const [owner, repo] = repoFullName.split("/");
 
       try {
-        const featurePath = `.shipflow/features/${slug}`;
         const { data: treeData } = await octokit.request(
           "GET /repos/{owner}/{repo}/git/trees/{tree_sha}",
           { owner, repo, tree_sha: branch, recursive: "1" }
@@ -41,7 +40,11 @@ export const deleteFeatureGitFunction = inngest.createFunction(
         
         const filesToDelete: { path: string; content: null }[] = [];
         treeData.tree.forEach(entry => {
-          if (entry.path && entry.path.startsWith(featurePath) && entry.type === "blob") {
+          if (
+            entry.path &&
+            (entry.path.startsWith(`.shipflow/features/${slug}`) || entry.path.startsWith(`.theship/features/${slug}`)) &&
+            entry.type === "blob"
+          ) {
             filesToDelete.push({
               path: entry.path,
               content: null // marks for deletion
@@ -55,7 +58,7 @@ export const deleteFeatureGitFunction = inngest.createFunction(
             repoFullName,
             branch,
             filesToDelete,
-            `docs(shipflow): delete feature "${title}" specifications [skip ci]`
+            `docs(theship): delete feature "${title}" specifications [skip ci]`
           );
         }
       } catch (err) {
@@ -86,14 +89,14 @@ export const syncGithubPushToKanbanFunction = inngest.createFunction(
         { owner, repo, tree_sha: branch, recursive: "1" }
       );
 
-      // 2. Find all tasks.md files under .shipflow/features/
+      // 2. Find all tasks.md files under .shipflow/features/ or .theship/features/
       const tasksFiles = treeData.tree.filter(entry => 
         entry.path && 
-        entry.path.startsWith(".shipflow/features/") && 
+        (entry.path.startsWith(".shipflow/features/") || entry.path.startsWith(".theship/features/")) && 
         entry.path.endsWith("/tasks.md")
       );
 
-      const updates: { taskId: string; isChecked: boolean }[] = [];
+      const updates: { taskId: string; status: "todo" | "in_progress" | "review" | "done" }[] = [];
 
       // 3. Fetch each tasks.md and parse checkboxes
       for (const file of tasksFiles) {
@@ -105,12 +108,20 @@ export const syncGithubPushToKanbanFunction = inngest.createFunction(
 
         if ("content" in contentData) {
           const content = Buffer.from(contentData.content, "base64").toString("utf-8");
-          const regex = /-\s*\[([ xX])\]\s*\*\*(.*?)\*\*\s*\(id:\s*([a-zA-Z0-9_-]+)\)/g;
+          const regex = /-\s*\[([ xX/\-])\]\s*\*\*(.*?)\*\*\s*\(id:\s*([a-zA-Z0-9_-]+)\)/g;
           let match;
           while ((match = regex.exec(content)) !== null) {
-            const isChecked = match[1].toLowerCase() === "x";
+            const char = match[1].toLowerCase();
             const taskId = match[3];
-            updates.push({ taskId, isChecked });
+            let status: "todo" | "in_progress" | "review" | "done" = "todo";
+            if (char === "x") {
+              status = "done";
+            } else if (char === "/") {
+              status = "in_progress";
+            } else if (char === "-") {
+              status = "review";
+            }
+            updates.push({ taskId, status });
           }
         }
       }
@@ -121,15 +132,14 @@ export const syncGithubPushToKanbanFunction = inngest.createFunction(
     // 4. Update task statuses in db
     await step.run("update-tasks-in-db", async () => {
       for (const update of taskUpdates) {
-        const targetStatus = update.isChecked ? "done" : "todo";
         const task = await prisma.task.findUnique({
           where: { id: update.taskId }
         });
 
-        if (task && task.status !== targetStatus) {
+        if (task && task.status !== update.status) {
           await prisma.task.update({
             where: { id: update.taskId },
-            data: { status: targetStatus }
+            data: { status: update.status }
           });
         }
       }
@@ -147,13 +157,12 @@ export const deleteProjectGitFunction = inngest.createFunction(
   async ({ event, step }) => {
     const { repoFullName, branch, installationId, name } = event.data;
 
-    await step.run("delete-shipflow-folder-from-github", async () => {
+    await step.run("delete-theship-folder-from-github", async () => {
       const app = getGithubApp();
       const octokit = await app.getInstallationOctokit(installationId);
       const [owner, repo] = repoFullName.split("/");
 
       try {
-        const shipflowPath = ".shipflow";
         const { data: treeData } = await octokit.request(
           "GET /repos/{owner}/{repo}/git/trees/{tree_sha}",
           { owner, repo, tree_sha: branch, recursive: "1" }
@@ -161,7 +170,11 @@ export const deleteProjectGitFunction = inngest.createFunction(
         
         const filesToDelete: { path: string; content: null }[] = [];
         treeData.tree.forEach(entry => {
-          if (entry.path && entry.path.startsWith(shipflowPath) && entry.type === "blob") {
+          if (
+            entry.path &&
+            (entry.path.startsWith(".shipflow") || entry.path.startsWith(".theship")) &&
+            entry.type === "blob"
+          ) {
             filesToDelete.push({
               path: entry.path,
               content: null // marks for deletion
@@ -175,11 +188,11 @@ export const deleteProjectGitFunction = inngest.createFunction(
             repoFullName,
             branch,
             filesToDelete,
-            `docs(shipflow): delete project "${name}" shipflow specifications [skip ci]`
+            `docs(theship): delete project "${name}" specifications [skip ci]`
           );
         }
       } catch (err) {
-        console.error("[deleteProjectGitFunction] Failed to delete .shipflow folder from GitHub:", err);
+        console.error("[deleteProjectGitFunction] Failed to delete specifications folders from GitHub:", err);
       }
     });
 

@@ -1,6 +1,6 @@
-# ShipFlow AI Monorepo
+# TheShip AI Monorepo
 
-ShipFlow is an AI-powered Product & Engineering Workspace designed to bridge the gap between product requirements and code implementation. It guides development through an automated, bidirectional pipeline: from raw feature requests to structured PRDs, auto-compiled engineering task lists, live IDE agent synchronization, pull request AI reviews, and final human release approvals.
+TheShip is an AI-powered Product & Engineering Workspace designed to bridge the gap between product requirements and code implementation. It guides development through an automated, bidirectional pipeline: from raw feature requests to structured PRDs, auto-compiled engineering task lists, live IDE agent synchronization, pull request AI reviews, and final human release approvals.
 
 ---
 
@@ -22,7 +22,7 @@ ShipFlow is an AI-powered Product & Engineering Workspace designed to bridge the
 
 ## 🏗️ Architecture
 
-ShipFlow is structured as a type-safe npm/pnpm workspace monorepo:
+TheShip is structured as a type-safe npm/pnpm workspace monorepo:
 
 ```
 ├── apps
@@ -36,7 +36,7 @@ ShipFlow is structured as a type-safe npm/pnpm workspace monorepo:
 
 ### Flow Diagram (Core Loop)
 ```
-Feature Request ➔ Discovery Chat ➔ Compile PRD ➔ Compile Tasks ➔ Sync to Git (.shipflow/)
+Feature Request ➔ Discovery Chat ➔ Compile PRD ➔ Compile Tasks ➔ Sync to Git (.theship/)
        ▲                                                                   │
        │                                                                   ▼
 Human Approval ◀── AI QA Re-Review ◀── Code Commit ◀── PR Webhook ◀── IDE Agent coding
@@ -62,7 +62,7 @@ The primary schema modeled in `packages/database/prisma/schema.prisma` is multi-
 
 ## ⚡ Async Workflows (Inngest)
 
-ShipFlow uses Inngest to manage long-running background tasks. Workflow events are defined in `apps/web/app/api/inngest/route.ts`:
+TheShip uses Inngest to manage long-running background tasks. Workflow events are defined in `apps/web/app/api/inngest/route.ts`:
 
 1. **Discovery Workflow (`app/feature.created` / `app/feature.chat_received`)**:
    * Evaluates feature requests using LLMs.
@@ -70,7 +70,7 @@ ShipFlow uses Inngest to manage long-running background tasks. Workflow events a
    * Compiles goals, user stories, acceptance criteria, and compiles a complete PRD.
    * Converts the approved PRD into database tasks.
 2. **Git Sync Workflow (`app/git_sync.requested` / `app/feature.deleted`)**:
-   * Commits specifications (`.shipflow/AI_PRIORITY.flag`, `.shipflow/00_START_HERE.md`, `.shipflow/features/{slug}/01_PRD.md`, `.shipflow/features/{slug}/02_TASKS.json`, `.shipflow/features/{slug}/tasks.md`) to the repository.
+   * Commits specifications (`.theship/AI_PRIORITY.flag`, `.theship/00_START_HERE.md`, `.theship/features/{slug}/01_PRD.md`, `.theship/features/{slug}/02_TASKS.json`, `.theship/features/{slug}/tasks.md`) to the repository.
    * Deletes directories recursively on GitHub when a feature request is deleted.
    * Commits root guidelines (`.cursorrules` & `CLAUDE.md`) to instruct IDE agents.
 3. **Pull Request Review Workflow (`github/pr.received`)**:
@@ -158,7 +158,7 @@ Open `http://localhost:3000` to access the dashboard.
 1. **Create GitHub App**: Go to developer settings and create a new GitHub App.
 2. **Set Webhooks**: Set the webhook URL pointing to your deployed endpoint (or local tunnels like ngrok/Localtunnel) pointing to `/api/github/webhook`.
 3. **Configure Permissions**:
-   * **Repository Contents**: `Read & Write` (essential for writing `.shipflow/` files).
+   * **Repository Contents**: `Read & Write` (essential for writing `.theship/` files).
    * **Pull Requests**: `Read & Write` (to fetch changed files and post reviews).
    * **Webhooks Subscriptions**: Enable `Pull request` and `Push` events.
 4. **Install App**: Install the App on your target repositories.

@@ -142,6 +142,7 @@ export default function FeatureDetailPage({
 }) {
   const { projectId, featureId } = use(params);
   const router = useRouter();
+  const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState("chat");
   const [message, setMessage] = useState("");
   const [isSkippingSingle, setIsSkippingSingle] = useState(false);
@@ -174,17 +175,21 @@ export default function FeatureDetailPage({
       if (sendMessageMutation.isPending) {
         return;
       }
+      const currentMessage = message.trim();
       if (isSkippingSingle) {
+        const skipMessage = `[Skip Single Question] ${currentMessage ? "Reason: " + currentMessage : "User declined to answer."}`;
+        setMessage("");
         sendMessageMutation.mutate({
           featureId,
-          message: `[Skip Single Question] ${message.trim() ? "Reason: " + message.trim() : "User declined to answer."}`,
+          message: skipMessage,
         });
         setIsSkippingSingle(false);
       } else {
-        if (!message.trim()) return;
+        if (!currentMessage) return;
+        setMessage("");
         sendMessageMutation.mutate({
           featureId,
-          message,
+          message: currentMessage,
         });
       }
     }
@@ -214,10 +219,30 @@ export default function FeatureDetailPage({
   );
 
   const sendMessageMutation = trpc.features.sendMessage.useMutation({
+    onMutate: async (newChat) => {
+      await utils.features.getChat.cancel({ featureId });
+      const previousChats = utils.features.getChat.getData({ featureId }) || [];
+      const optimisticMessage = {
+        id: `optimistic-${Date.now()}`,
+        sender: "user",
+        message: newChat.message,
+        createdAt: new Date().toISOString(),
+        featureRequestId: featureId,
+      };
+      utils.features.getChat.setData({ featureId }, [...previousChats, optimisticMessage]);
+      return { previousChats };
+    },
+    onError: (err, newChat, context) => {
+      if (context?.previousChats) {
+        utils.features.getChat.setData({ featureId }, context.previousChats);
+      }
+    },
     onSuccess: () => {
-      setMessage("");
       refetchChats();
       refetchFeature();
+    },
+    onSettled: () => {
+      utils.features.getChat.invalidate({ featureId });
     },
   });
 
@@ -226,17 +251,21 @@ export default function FeatureDetailPage({
     if (sendMessageMutation.isPending) {
       return;
     }
+    const currentMessage = message.trim();
     if (isSkippingSingle) {
+      const skipMessage = `[Skip Single Question] ${currentMessage ? "Reason: " + currentMessage : "User declined to answer."}`;
+      setMessage("");
       sendMessageMutation.mutate({
         featureId,
-        message: `[Skip Single Question] ${message.trim() ? "Reason: " + message.trim() : "User declined to answer."}`,
+        message: skipMessage,
       });
       setIsSkippingSingle(false);
     } else {
-      if (!message.trim()) return;
+      if (!currentMessage) return;
+      setMessage("");
       sendMessageMutation.mutate({
         featureId,
-        message,
+        message: currentMessage,
       });
     }
   };
@@ -430,7 +459,7 @@ export default function FeatureDetailPage({
                   <Card className="border-border bg-card shadow-sm h-full">
                     <CardHeader className="border-b border-border/50 py-4 bg-muted/20">
                       <CardTitle className="text-base font-bold text-foreground">Product Requirements Document</CardTitle>
-                      <CardDescription>Generated automatically by ShipFlow AI Product Agent</CardDescription>
+                      <CardDescription>Generated automatically by TheShip AI Product Agent</CardDescription>
                     </CardHeader>
                     <CardContent className="p-6 overflow-y-auto max-h-[600px]">
                       {feature.prd?.rawContent ? (
@@ -971,7 +1000,7 @@ export default function FeatureDetailPage({
               <br />
               1. Permanently delete the feature request, its PRD, chat messages, and Kanban board tasks.
               <br />
-              2. Delete the associated specifications folder <code className="bg-muted px-1 py-0.5 rounded text-xs">.shipflow/features/{feature.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")}</code> from your GitHub repository.
+              2. Delete the associated specifications folder <code className="bg-muted px-1 py-0.5 rounded text-xs">.theship/features/{feature.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")}</code> from your GitHub repository.
               <br /><br />
               This action cannot be undone.
             </DialogDescription>

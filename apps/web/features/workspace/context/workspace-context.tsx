@@ -25,9 +25,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("shipflow_active_workspace_id");
+    const saved = localStorage.getItem("theship_active_workspace_id") || localStorage.getItem("shipflow_active_workspace_id");
     if (saved) {
       setActiveWorkspaceId(saved);
+      localStorage.setItem("theship_active_workspace_id", saved);
     }
   }, []);
 
@@ -36,7 +37,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if (!activeWorkspaceId || !workspaces.some((w) => w.id === activeWorkspaceId)) {
         const defaultId = workspaces[0].id;
         setActiveWorkspaceId(defaultId);
-        localStorage.setItem("shipflow_active_workspace_id", defaultId);
+        localStorage.setItem("theship_active_workspace_id", defaultId);
       }
     } else {
       setActiveWorkspaceId(null);
@@ -47,7 +48,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveWorkspace = (id: string) => {
     setActiveWorkspaceId(id);
-    localStorage.setItem("shipflow_active_workspace_id", id);
+    localStorage.setItem("theship_active_workspace_id", id);
   };
 
   return (

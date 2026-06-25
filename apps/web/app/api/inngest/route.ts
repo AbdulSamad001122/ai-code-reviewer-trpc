@@ -8,7 +8,7 @@ import {
   onFeatureChatReceivedFunction,
   onFeatureReleaseRejectedFunction,
 } from "@/features/features/server/discovery-workflow";
-import { syncFeatureGitFunction, syncGithubPushToKanbanFunction, deleteFeatureGitFunction } from "@/features/git-sync/server/git-sync-function";
+import { syncFeatureGitFunction, syncGithubPushToKanbanFunction, deleteFeatureGitFunction, deleteProjectGitFunction } from "@/features/git-sync/server/git-sync-function";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -22,5 +22,6 @@ export const { GET, POST, PUT } = serve({
     syncFeatureGitFunction,
     syncGithubPushToKanbanFunction,
     deleteFeatureGitFunction,
+    deleteProjectGitFunction,
   ],
 });

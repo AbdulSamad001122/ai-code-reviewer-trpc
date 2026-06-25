@@ -138,3 +138,51 @@ export const syncGithubPushToKanbanFunction = inngest.createFunction(
     return { processedCount: taskUpdates.length };
   }
 );
+
+export const deleteProjectGitFunction = inngest.createFunction(
+  {
+    id: "delete-project-git",
+    triggers: { event: "app/project.deleted" },
+  },
+  async ({ event, step }) => {
+    const { repoFullName, branch, installationId, name } = event.data;
+
+    await step.run("delete-shipflow-folder-from-github", async () => {
+      const app = getGithubApp();
+      const octokit = await app.getInstallationOctokit(installationId);
+      const [owner, repo] = repoFullName.split("/");
+
+      try {
+        const shipflowPath = ".shipflow";
+        const { data: treeData } = await octokit.request(
+          "GET /repos/{owner}/{repo}/git/trees/{tree_sha}",
+          { owner, repo, tree_sha: branch, recursive: "1" }
+        );
+        
+        const filesToDelete: { path: string; content: null }[] = [];
+        treeData.tree.forEach(entry => {
+          if (entry.path && entry.path.startsWith(shipflowPath) && entry.type === "blob") {
+            filesToDelete.push({
+              path: entry.path,
+              content: null // marks for deletion
+            });
+          }
+        });
+
+        if (filesToDelete.length > 0) {
+          await commitMultipleFiles(
+            installationId,
+            repoFullName,
+            branch,
+            filesToDelete,
+            `docs(shipflow): delete project "${name}" shipflow specifications [skip ci]`
+          );
+        }
+      } catch (err) {
+        console.error("[deleteProjectGitFunction] Failed to delete .shipflow folder from GitHub:", err);
+      }
+    });
+
+    return { success: true, repoFullName };
+  }
+);

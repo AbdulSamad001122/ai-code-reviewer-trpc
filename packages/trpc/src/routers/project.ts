@@ -1,6 +1,9 @@
 import { router, protectedProcedure } from "../trpc.js";
 import { z } from "zod";
 import { prisma } from "@ai-code-reviewer-trpc/database";
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "ai-code-reviewer" });
 
 export const projectRouter = router({
   list: protectedProcedure
@@ -122,6 +125,42 @@ export const projectRouter = router({
 
       if (!project) {
         throw new Error("Project not found or you are not authorized to delete it (must be workspace owner)");
+      }
+
+      let installationId = 0;
+      try {
+        const ownerMember = await prisma.workspaceMember.findFirst({
+          where: { workspaceId: project.workspaceId, role: "owner" },
+          include: { user: { include: { githubInstallation: true } } }
+        });
+        if (ownerMember?.user?.githubInstallation?.installationId) {
+          installationId = ownerMember.user.githubInstallation.installationId;
+        } else {
+          const repoSync = await prisma.repoSync.findUnique({
+            where: { repoFullName: project.repoFullName }
+          });
+          if (repoSync?.installationId) {
+            installationId = repoSync.installationId;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to find installation ID for project deletion sync:", e);
+      }
+
+      if (installationId) {
+        try {
+          await inngest.send({
+            name: "app/project.deleted",
+            data: {
+              repoFullName: project.repoFullName,
+              branch: project.branch,
+              installationId,
+              name: project.name,
+            },
+          });
+        } catch (error) {
+          console.error("Failed to trigger Inngest event for app/project.deleted:", error);
+        }
       }
 
       const deletedProject = await prisma.project.delete({

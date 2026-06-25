@@ -19,7 +19,6 @@ import {
   Crown,
   Gear,
   Sparkle,
-  Terminal,
   ArrowUpRight,
 } from "@phosphor-icons/react";
 
@@ -38,46 +37,9 @@ export default function SettingsPage() {
     },
   });
 
-  const [simulating, setSimulating] = useState(false);
-
   const handleUpgrade = (variant: "starter" | "unlimited") => {
     toast.loading(`Redirecting to Lemon Squeezy checkout...`);
     checkoutMutation.mutate({ variant });
-  };
-
-  const handleMockWebhook = async (plan: "free" | "starter" | "unlimited", status: string) => {
-    setSimulating(true);
-    try {
-      // Find user id from somewhere. We can query getBillingState to return userId or check if we can get it.
-      // Wait, we can fetch userId in getBillingState, let's check!
-      // In getBillingState, we didn't return userId. Let's make the mock endpoint handle active session user if userId isn't provided,
-      // or we can pass a dummy userId or call it directly.
-      // Wait! Let's verify how the mock webhook can identify the user.
-      // Since it's a POST request from the client in development mode, we can read the session cookie in the mock webhook and find the logged-in user!
-      // Yes! That's incredibly elegant. Let's pass the active session user's id. Let's make the mock webhook query the session, or the client can pass userId if we return it in getBillingState.
-      // Let's modify billingRouter.getBillingState to also return the userId!
-      // Wait, let's look at getBillingState in packages/trpc/src/routers/billing.ts. It fetches user by ctx.user.id. So we can just return userId: ctx.user.id in the billing state!
-      // Let's check: yes, we can return userId: ctx.user.id in getBillingState! Let's update billing.ts or make the mock webhook read the user session.
-      // Actually, passing the userId from the client is super simple if getBillingState returns it. Let's make sure the client gets the userId.
-      const userId = (billing as any)?.userId;
-      
-      const response = await fetch("/api/billing/mock-webhook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, plan, status }),
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      toast.success(`Successfully simulated ${plan} upgrade!`);
-      refetch();
-    } catch (e: any) {
-      toast.error(`Simulation failed: ${e.message}`);
-    } finally {
-      setSimulating(false);
-    }
   };
 
   if (isLoading) {
@@ -309,47 +271,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Developer simulation panel */}
-      {process.env.NODE_ENV === "development" && (
-        <Card className="border-dashed border-primary/40 bg-accent/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-bold text-primary flex items-center gap-1.5">
-              <Terminal className="size-4" /> Developer Simulation Toolbar
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Simulate subscription upgrades/downgrades instantly to verify limits enforcement logic locally.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2.5">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleMockWebhook("free", "inactive")}
-              disabled={simulating}
-            >
-              Simulate Free Tier
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-primary/40 text-primary hover:bg-primary/5"
-              onClick={() => handleMockWebhook("starter", "active")}
-              disabled={simulating}
-            >
-              Simulate Starter Tier ($3)
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-500/40 text-amber-600 hover:bg-amber-500/5"
-              onClick={() => handleMockWebhook("unlimited", "active")}
-              disabled={simulating}
-            >
-              Simulate Unlimited Tier ($9)
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+
     </div>
   );
 }

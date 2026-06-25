@@ -16,6 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, GitFork } from "@phosphor-icons/react";
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxEmpty,
+} from "@/components/ui/combobox";
 
 export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: () => void }) {
   const [open, setOpen] = useState(false);
@@ -23,8 +31,16 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
   const [description, setDescription] = useState("");
   const [repoFullName, setRepoFullName] = useState("");
   const [branch, setBranch] = useState("main");
+  const [repoSearch, setRepoSearch] = useState("");
 
   const { activeWorkspace } = useWorkspace();
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setRepoSearch("");
+    }
+  };
 
   const { data: installStatus } = trpc.github.getInstallationStatus.useQuery();
 
@@ -40,6 +56,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
       setDescription("");
       setRepoFullName("");
       setBranch("main");
+      setRepoSearch("");
       if (onProjectCreated) {
         onProjectCreated();
       }
@@ -61,8 +78,12 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
     });
   };
 
+  const filteredRepos = reposData?.repos?.filter((repo: any) =>
+    repo.fullName.toLowerCase().includes(repoSearch.toLowerCase())
+  ) || [];
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button className="cursor-pointer gap-2 bg-primary text-primary-foreground font-semibold">
@@ -126,27 +147,41 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
                     No repositories found. Make sure your GitHub App installation is configured for this account.
                   </div>
                 ) : (
-                  <select
-                    id="repo-select"
-                    value={repoFullName}
-                    onChange={(e) => {
-                      setRepoFullName(e.target.value);
-                      if (!name) {
-                        const parts = e.target.value.split("/");
-                        setName(parts[parts.length - 1] || "");
-                      }
-                    }}
-                    required
-                    disabled={createProjectMutation.isPending}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="" disabled>Select a repository...</option>
-                    {reposData.repos.map((repo: any) => (
-                      <option key={repo.id} value={repo.fullName}>
-                        {repo.fullName}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <Combobox
+                      value={repoFullName}
+                      onValueChange={(val) => {
+                        setRepoFullName(val || "");
+                        setRepoSearch(val || "");
+                        if (val && !name) {
+                          const parts = val.split("/");
+                          setName(parts[parts.length - 1] || "");
+                        }
+                      }}
+                      inputValue={repoSearch}
+                      onInputValueChange={setRepoSearch}
+                    >
+                      <ComboboxInput
+                        placeholder="Search or select a repository..."
+                        className="w-full h-10 border-border bg-background"
+                        disabled={createProjectMutation.isPending}
+                      />
+                      <ComboboxContent className="w-[var(--anchor-width)] max-h-60 overflow-y-auto">
+                        <ComboboxList>
+                          {filteredRepos.map((repo: any) => (
+                            <ComboboxItem
+                              key={repo.id}
+                              value={repo.fullName}
+                              className="cursor-pointer"
+                            >
+                              {repo.fullName}
+                            </ComboboxItem>
+                          ))}
+                        </ComboboxList>
+                        <ComboboxEmpty>No repositories found</ComboboxEmpty>
+                      </ComboboxContent>
+                    </Combobox>
+                  </div>
                 )}
               </div>
             )}

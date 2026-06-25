@@ -54,6 +54,8 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = trpc.project.get.useQuery({ projectId });
 
@@ -63,41 +65,49 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
     refetch: refetchFeatures,
   } = trpc.features.list.useQuery({ projectId });
 
-  const createFeatureMutation = trpc.features.create.useMutation({
-    onSuccess: async () => {
-      await refetchFeatures();
-      setOpen(false);
-      setTitle("");
-      setDescription("");
-    },
-  });
+  const createFeatureMutation = trpc.features.create.useMutation();
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedFeatureId, setSelectedFeatureId] = useState("");
   const [selectedFeatureTitle, setSelectedFeatureTitle] = useState("");
 
-  const deleteFeatureMutation = trpc.features.delete.useMutation({
-    onSuccess: async () => {
+  const deleteFeatureMutation = trpc.features.delete.useMutation();
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedFeatureId || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteFeatureMutation.mutateAsync({ featureId: selectedFeatureId });
       await refetchFeatures();
       setShowDeleteDialog(false);
-    },
-  });
-
-  const handleDeleteConfirm = () => {
-    if (!selectedFeatureId) return;
-    deleteFeatureMutation.mutate({ featureId: selectedFeatureId });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || createFeatureMutation.isPending) {
+    if (!title.trim() || !description.trim() || isSubmitting) {
       return;
     }
-    createFeatureMutation.mutate({
-      projectId,
-      title,
-      description,
-    });
+    setIsSubmitting(true);
+    try {
+      await createFeatureMutation.mutateAsync({
+        projectId,
+        title,
+        description,
+      });
+      await refetchFeatures();
+      setOpen(false);
+      setTitle("");
+      setDescription("");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoadingProject) {
@@ -156,7 +166,7 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     required
-                    disabled={createFeatureMutation.isPending}
+                    disabled={isSubmitting}
                     className="border-border bg-background"
                   />
                 </div>
@@ -171,7 +181,7 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     required
-                    disabled={createFeatureMutation.isPending}
+                    disabled={isSubmitting}
                     className="border-border bg-background min-h-[120px]"
                   />
                 </div>
@@ -188,17 +198,17 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
                   type="button"
                   variant="outline"
                   onClick={() => setOpen(false)}
-                  disabled={createFeatureMutation.isPending}
+                  disabled={isSubmitting}
                   className="border-border cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!title.trim() || !description.trim() || createFeatureMutation.isPending}
+                  disabled={!title.trim() || !description.trim() || isSubmitting}
                   className="bg-primary text-primary-foreground cursor-pointer"
                 >
-                  {createFeatureMutation.isPending ? "Submitting..." : "Start Discovery"}
+                  {isSubmitting ? "Submitting..." : "Start Discovery"}
                 </Button>
               </DialogFooter>
             </form>
@@ -325,7 +335,7 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
               type="button"
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
-              disabled={deleteFeatureMutation.isPending}
+              disabled={isDeleting}
               className="border-border cursor-pointer"
             >
               Cancel
@@ -333,10 +343,10 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
             <Button
               type="button"
               onClick={handleDeleteConfirm}
-              disabled={deleteFeatureMutation.isPending}
+              disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90 text-white cursor-pointer font-semibold"
             >
-              {deleteFeatureMutation.isPending ? "Deleting..." : "Yes, Delete Feature"}
+              {isDeleting ? "Deleting..." : "Yes, Delete Feature"}
             </Button>
           </DialogFooter>
         </DialogContent>

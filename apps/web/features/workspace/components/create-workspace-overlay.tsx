@@ -11,8 +11,8 @@ export function CreateWorkspaceOverlay() {
   const [name, setName] = useState("");
   const { refetchWorkspaces } = useWorkspace();
   const createWorkspaceMutation = trpc.workspace.create.useMutation({
-    onSuccess: async () => {
-      await refetchWorkspaces();
+    onSuccess: () => {
+      refetchWorkspaces();
     },
   });
 

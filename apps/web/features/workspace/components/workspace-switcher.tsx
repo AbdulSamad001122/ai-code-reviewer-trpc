@@ -24,8 +24,8 @@ export function WorkspaceSwitcher() {
   const [name, setName] = React.useState("");
 
   const createWorkspaceMutation = trpc.workspace.create.useMutation({
-    onSuccess: async () => {
-      await refetchWorkspaces();
+    onSuccess: () => {
+      refetchWorkspaces();
       setIsDialogOpen(false);
       setName("");
     },

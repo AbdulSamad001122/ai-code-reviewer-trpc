@@ -32,6 +32,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
   const [repoFullName, setRepoFullName] = useState("");
   const [branch, setBranch] = useState("main");
   const [repoSearch, setRepoSearch] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { activeWorkspace } = useWorkspace();
 
@@ -49,8 +50,23 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
     { enabled: !!installStatus?.connected && open }
   );
 
-  const createProjectMutation = trpc.project.create.useMutation({
-    onSuccess: async () => {
+  const createProjectMutation = trpc.project.create.useMutation();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeWorkspace || !name.trim() || !repoFullName || isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createProjectMutation.mutateAsync({
+        workspaceId: activeWorkspace.id,
+        name,
+        description: description || undefined,
+        repoFullName,
+        branch,
+      });
       if (onProjectCreated) {
         await onProjectCreated();
       }
@@ -60,22 +76,11 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
       setRepoFullName("");
       setBranch("main");
       setRepoSearch("");
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeWorkspace || !name.trim() || !repoFullName || createProjectMutation.isPending) {
-      return;
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    createProjectMutation.mutate({
-      workspaceId: activeWorkspace.id,
-      name,
-      description: description || undefined,
-      repoFullName,
-      branch,
-    });
   };
 
   const filteredRepos = reposData?.repos?.filter((repo: any) =>
@@ -112,7 +117,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                disabled={createProjectMutation.isPending}
+                disabled={isSubmitting}
                 className="border-border bg-background"
               />
             </div>
@@ -126,7 +131,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
                 placeholder="Describe what this project is about..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                disabled={createProjectMutation.isPending}
+                disabled={isSubmitting}
                 className="border-border bg-background min-h-[80px]"
               />
             </div>
@@ -164,7 +169,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
                       <ComboboxInput
                         placeholder="Search or select a repository..."
                         className="w-full h-10 border-border bg-background"
-                        disabled={createProjectMutation.isPending}
+                        disabled={isSubmitting}
                       />
                       <ComboboxContent className="w-[var(--anchor-width)] max-h-60 overflow-y-auto">
                         <ComboboxList>
@@ -196,7 +201,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
                 required
-                disabled={createProjectMutation.isPending}
+                disabled={isSubmitting}
                 className="border-border bg-background"
               />
             </div>
@@ -213,17 +218,17 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
-              disabled={createProjectMutation.isPending}
+              disabled={isSubmitting}
               className="border-border cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={!name.trim() || !repoFullName || createProjectMutation.isPending}
+              disabled={!name.trim() || !repoFullName || isSubmitting}
               className="bg-primary text-primary-foreground cursor-pointer"
             >
-              {createProjectMutation.isPending ? "Creating..." : "Link Project"}
+              {isSubmitting ? "Creating..." : "Link Project"}
             </Button>
           </DialogFooter>
         </form>

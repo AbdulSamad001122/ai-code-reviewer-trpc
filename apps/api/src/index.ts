@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import "dotenv/config";
+import { rateLimit } from "express-rate-limit";
 
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter, createContext } from "@ai-code-reviewer-trpc/trpc";
@@ -50,6 +51,43 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Helper to parse cookies on incoming request
+function getCookieValue(cookieHeader: string, name: string): string | null {
+  const match = cookieHeader.match(new RegExp('(^|;\\s*)' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
+  return match ? decodeURIComponent(match[2] || "") : null;
+}
+
+// Generate rate limiting key strictly by authenticated session token
+function getRateLimitKey(req: express.Request): string {
+  const cookieHeader = req.headers.cookie || "";
+  const token = getCookieValue(cookieHeader, "better-auth.session_token") || 
+                getCookieValue(cookieHeader, "__Secure-better-auth.session_token") ||
+                (req.headers.authorization?.startsWith("Bearer ") 
+                  ? req.headers.authorization.substring(7) 
+                  : null);
+
+  if (token) {
+    return token.split(".")[0] || token;
+  }
+
+  // Strict: All unauthenticated requests share a single rate limit bucket
+  return "anonymous";
+}
+
+// Set up rate limiting middleware to protect endpoints
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  limit: 100, 
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: (req) => getRateLimitKey(req),
+  skip: (req) => req.path === "/health",
+  message: {
+    error: "Too many requests, please try again after 15 minutes."
+  }
+});
+app.use(limiter);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });

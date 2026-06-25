@@ -67,6 +67,8 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
   const [description, setDescription] = useState("");
   const [selectedPrdId, setSelectedPrdId] = useState<string>("none");
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: project, isLoading: isLoadingProject } = trpc.project.get.useQuery({ projectId });
 
@@ -82,36 +84,24 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
     refetch: refetchTasks,
   } = trpc.tasks.list.useQuery({ projectId });
 
-  const createTaskMutation = trpc.tasks.create.useMutation({
-    onSuccess: async () => {
-      await refetchTasks();
-      setOpen(false);
-      setTitle("");
-      setDescription("");
-      setSelectedPrdId("none");
-    },
-  });
+  const createTaskMutation = trpc.tasks.create.useMutation();
 
   const updateStatusMutation = trpc.tasks.updateStatus.useMutation({
-    onSuccess: async () => {
-      await refetchTasks();
+    onSuccess: () => {
+      refetchTasks();
     },
   });
 
-  const deleteTaskMutation = trpc.tasks.delete.useMutation({
-    onSuccess: async () => {
-      await refetchTasks();
-      setDeleteTaskId(null);
-    },
-  });
+  const deleteTaskMutation = trpc.tasks.delete.useMutation();
 
   const handleDeleteTask = (taskId: string) => {
     setDeleteTaskId(taskId);
   };
 
   const approvePlanMutation = trpc.tasks.approvePlan.useMutation({
-    onSuccess: async () => {
-      await Promise.all([refetchFeatures(), refetchTasks()]);
+    onSuccess: () => {
+      refetchFeatures();
+      refetchTasks();
     },
   });
 
@@ -119,16 +109,42 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
 
   const prdLinkedFeatures = features.filter((f) => f.prd !== null && f.prd !== undefined);
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || createTaskMutation.isPending) return;
+    if (!title.trim() || isSubmitting) return;
 
-    createTaskMutation.mutate({
-      projectId,
-      title: title.trim(),
-      description: description.trim() || null,
-      prdId: selectedPrdId === "none" ? null : selectedPrdId,
-    });
+    setIsSubmitting(true);
+    try {
+      await createTaskMutation.mutateAsync({
+        projectId,
+        title: title.trim(),
+        description: description.trim() || null,
+        prdId: selectedPrdId === "none" ? null : selectedPrdId,
+      });
+      await refetchTasks();
+      setOpen(false);
+      setTitle("");
+      setDescription("");
+      setSelectedPrdId("none");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteTaskConfirm = async () => {
+    if (!deleteTaskId || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteTaskMutation.mutateAsync({ taskId: deleteTaskId });
+      await refetchTasks();
+      setDeleteTaskId(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleUpdateStatus = (taskId: string, status: TaskStatus) => {
@@ -232,7 +248,7 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     required
-                    disabled={createTaskMutation.isPending}
+                    disabled={isSubmitting}
                     className="border-border bg-background"
                   />
                 </div>
@@ -246,7 +262,7 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                     placeholder="Detail the technical specifications or requirements..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    disabled={createTaskMutation.isPending}
+                    disabled={isSubmitting}
                     className="border-border bg-background min-h-[100px]"
                   />
                 </div>
@@ -259,7 +275,7 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                     id="linked-prd"
                     value={selectedPrdId}
                     onChange={(e) => setSelectedPrdId(e.target.value)}
-                    disabled={createTaskMutation.isPending}
+                    disabled={isSubmitting}
                     className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="none">General Project Task (No Link)</option>
@@ -283,17 +299,17 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                   type="button"
                   variant="outline"
                   onClick={() => setOpen(false)}
-                  disabled={createTaskMutation.isPending}
+                  disabled={isSubmitting}
                   className="border-border cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!title.trim() || createTaskMutation.isPending}
+                  disabled={!title.trim() || isSubmitting}
                   className="bg-primary text-primary-foreground cursor-pointer"
                 >
-                  {createTaskMutation.isPending ? "Creating..." : "Create Task"}
+                  {isSubmitting ? "Creating..." : "Create Task"}
                 </Button>
               </DialogFooter>
             </form>
@@ -478,7 +494,7 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
       </div>
 
       <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => {
-        if (!open && !deleteTaskMutation.isPending) {
+        if (!open && !isDeleting) {
           setDeleteTaskId(null);
         }
       }}>
@@ -490,21 +506,19 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel disabled={deleteTaskMutation.isPending} className="border-border cursor-pointer">
+            <AlertDialogCancel disabled={isDeleting} className="border-border cursor-pointer">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
-                if (deleteTaskId) {
-                  deleteTaskMutation.mutate({ taskId: deleteTaskId });
-                }
+                handleDeleteTaskConfirm();
               }}
-              disabled={deleteTaskMutation.isPending}
+              disabled={isDeleting}
               variant="destructive"
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer font-semibold"
             >
-              {deleteTaskMutation.isPending ? (
+              {isDeleting ? (
                 <>
                   <Spinner className="mr-2 size-4 inline animate-spin" />
                   Deleting...

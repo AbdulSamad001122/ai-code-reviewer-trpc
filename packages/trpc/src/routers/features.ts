@@ -107,13 +107,17 @@ export const featuresRouter = router({
         },
       });
 
-      await inngest.send({
-        name: "app/feature.created",
-        data: {
-          featureRequestId: feature.id,
-          projectId: input.projectId,
-        },
-      });
+      try {
+        await inngest.send({
+          name: "app/feature.created",
+          data: {
+            featureRequestId: feature.id,
+            projectId: input.projectId,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to trigger Inngest event for app/feature.created:", error);
+      }
 
       return feature;
     }),
@@ -232,12 +236,16 @@ export const featuresRouter = router({
         },
       });
 
-      await inngest.send({
-        name: "app/feature.chat_received",
-        data: {
-          featureRequestId: input.featureId,
-        },
-      });
+      try {
+        await inngest.send({
+          name: "app/feature.chat_received",
+          data: {
+            featureRequestId: input.featureId,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to trigger Inngest event for app/feature.chat_received:", error);
+      }
 
       return chatMessage;
     }),
@@ -341,13 +349,17 @@ export const featuresRouter = router({
       });
 
       if (input.reason) {
-        await inngest.send({
-          name: "app/feature.release_rejected",
-          data: {
-            featureRequestId: input.featureId,
-            reason: input.reason,
-          },
-        });
+        try {
+          await inngest.send({
+            name: "app/feature.release_rejected",
+            data: {
+              featureRequestId: input.featureId,
+              reason: input.reason,
+            },
+          });
+        } catch (error) {
+          console.error("Failed to trigger Inngest event for app/feature.release_rejected:", error);
+        }
       }
 
       return updatedFeature;
@@ -408,26 +420,43 @@ export const featuresRouter = router({
       }
 
       if (installationId) {
-        await inngest.send({
-          name: "app/feature.deleted",
-          data: {
-            slug,
-            repoFullName: feature.project.repoFullName,
-            branch: feature.project.branch,
-            installationId,
-            title: feature.title,
-          },
-        });
+        try {
+          await inngest.send({
+            name: "app/feature.deleted",
+            data: {
+              slug,
+              repoFullName: feature.project.repoFullName,
+              branch: feature.project.branch,
+              installationId,
+              title: feature.title,
+            },
+          });
+        } catch (error) {
+          console.error("Failed to trigger Inngest event for app/feature.deleted:", error);
+        }
       }
 
-      // 2. Delete tasks associated with the feature
+      // 2. Manually cascade delete dependent records to avoid database foreign key constraint errors in production
       if (feature.prd) {
         await prisma.task.deleteMany({
           where: { prdId: feature.prd.id },
         });
       }
 
-      // 3. Delete feature request
+      await prisma.featureRequestChat.deleteMany({
+        where: { featureRequestId: input.featureId },
+      });
+
+      await prisma.pRD.deleteMany({
+        where: { featureRequestId: input.featureId },
+      });
+
+      await prisma.pullRequest.updateMany({
+        where: { featureRequestId: input.featureId },
+        data: { featureRequestId: null },
+      });
+
+      // 3. Delete feature request itself
       const deletedFeature = await prisma.featureRequest.delete({
         where: { id: input.featureId },
       });

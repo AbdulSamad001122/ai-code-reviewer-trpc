@@ -87,10 +87,14 @@ export const tasksRouter = router({
           select: { featureRequestId: true },
         });
         if (prd?.featureRequestId) {
-          await inngest.send({
-            name: "app/git_sync.requested",
-            data: { featureId: prd.featureRequestId },
-          });
+          try {
+            await inngest.send({
+              name: "app/git_sync.requested",
+              data: { featureId: prd.featureRequestId },
+            });
+          } catch (error) {
+            console.error("Failed to trigger Inngest event for app/git_sync.requested during task creation:", error);
+          }
         }
       }
 
@@ -142,10 +146,14 @@ export const tasksRouter = router({
           select: { featureRequestId: true },
         });
         if (prd?.featureRequestId) {
-          await inngest.send({
-            name: "app/git_sync.requested",
-            data: { featureId: prd.featureRequestId },
-          });
+          try {
+            await inngest.send({
+              name: "app/git_sync.requested",
+              data: { featureId: prd.featureRequestId },
+            });
+          } catch (error) {
+            console.error("Failed to trigger Inngest event for app/git_sync.requested during status update:", error);
+          }
         }
       }
 
@@ -191,10 +199,14 @@ export const tasksRouter = router({
           select: { featureRequestId: true },
         });
         if (prd?.featureRequestId) {
-          await inngest.send({
-            name: "app/git_sync.requested",
-            data: { featureId: prd.featureRequestId },
-          });
+          try {
+            await inngest.send({
+              name: "app/git_sync.requested",
+              data: { featureId: prd.featureRequestId },
+            });
+          } catch (error) {
+            console.error("Failed to trigger Inngest event for app/git_sync.requested during task deletion:", error);
+          }
         }
       }
 

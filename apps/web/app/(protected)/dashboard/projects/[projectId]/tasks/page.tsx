@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -100,6 +101,7 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
   const deleteTaskMutation = trpc.tasks.delete.useMutation({
     onSuccess: () => {
       refetchTasks();
+      setDeleteTaskId(null);
     },
   });
 
@@ -322,7 +324,14 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                 disabled={approvePlanMutation.isPending}
                 className="cursor-pointer bg-amber-600 text-white hover:bg-amber-700 font-semibold shadow-xs shrink-0 self-stretch sm:self-auto text-center"
               >
-                {approvePlanMutation.isPending ? "Processing..." : "Approve Plan & Start Development"}
+                {approvePlanMutation.isPending && approvePlanMutation.variables?.featureId === feature.id ? (
+                  <>
+                    <Spinner className="mr-2 size-4 inline animate-spin text-white" />
+                    Processing...
+                  </>
+                ) : (
+                  "Approve Plan & Start Development"
+                )}
               </Button>
             </Alert>
           ))}
@@ -358,12 +367,16 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                 ) : (
                   columnTasks.map((task) => {
                     const matchedFeature = features.find((f) => f.prd?.id === task.prdId);
+                    const isUpdatingThisTask = updateStatusMutation.isPending && updateStatusMutation.variables?.taskId === task.id;
 
                     return (
                       <Card
                         key={task.id}
                         size="sm"
-                        className="shrink-0 border-border bg-card shadow-xs hover:shadow-md transition-all duration-200 group relative overflow-hidden rounded-xl py-3"
+                        className={cn(
+                          "shrink-0 border-border bg-card shadow-xs hover:shadow-md transition-all duration-200 group relative overflow-hidden rounded-xl py-3",
+                          isUpdatingThisTask && "opacity-60 pointer-events-none"
+                        )}
                       >
                         <CardHeader className="p-3 pb-1.5 flex flex-row items-start justify-between gap-2">
                           <div className="space-y-1 flex-1">
@@ -380,18 +393,21 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                             )}
                           </div>
 
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer focus-visible:ring-0"
-                                />
-                              }
-                            >
-                              <DotsThreeOutlineVertical weight="fill" className="size-4" />
-                            </DropdownMenuTrigger>
+                          {isUpdatingThisTask ? (
+                            <Spinner className="size-4 shrink-0 mt-1 text-primary" />
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer focus-visible:ring-0"
+                                  />
+                                }
+                              >
+                                <DotsThreeOutlineVertical weight="fill" className="size-4" />
+                              </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="border-border bg-card">
                               {column.id !== "todo" && (
                                 <DropdownMenuItem
@@ -440,6 +456,7 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          )}
                         </CardHeader>
                         <CardContent className="p-3 pt-0 text-xs text-muted-foreground space-y-2">
                           {task.description && (
@@ -461,26 +478,41 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
         })}
       </div>
 
-      <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
-        <AlertDialogContent>
+      <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => {
+        if (!open && !deleteTaskMutation.isPending) {
+          setDeleteTaskId(null);
+        }
+      }}>
+        <AlertDialogContent className="border-border bg-card">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-foreground">Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
               This action cannot be undone. This will permanently delete the task from the Kanban board.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel disabled={deleteTaskMutation.isPending} className="border-border cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
                 if (deleteTaskId) {
                   deleteTaskMutation.mutate({ taskId: deleteTaskId });
-                  setDeleteTaskId(null);
                 }
               }}
+              disabled={deleteTaskMutation.isPending}
               variant="destructive"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer font-semibold"
             >
-              Yes, delete task
+              {deleteTaskMutation.isPending ? (
+                <>
+                  <Spinner className="mr-2 size-4 inline animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Yes, delete task"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

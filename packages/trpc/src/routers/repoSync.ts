@@ -40,10 +40,14 @@ export const repoSyncRouter = router({
         },
       });
 
-      await inngest.send({
-        name: "repo/sync.requested",
-        data: { repoSyncId: repoSync.id },
-      });
+      try {
+        await inngest.send({
+          name: "repo/sync.requested",
+          data: { repoSyncId: repoSync.id },
+        });
+      } catch (error) {
+        console.error("Failed to trigger Inngest event for repo/sync.requested:", error);
+      }
 
       return { success: true, repoSyncId: repoSync.id };
     }),

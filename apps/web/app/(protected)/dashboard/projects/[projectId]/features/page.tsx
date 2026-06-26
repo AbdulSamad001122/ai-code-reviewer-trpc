@@ -277,6 +277,19 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {feature.prd && (
+                        <Button
+                          render={
+                            <Link href={`/dashboard/projects/${projectId}/tasks?featureId=${feature.prd.id}`} className="gap-1 flex items-center font-semibold">
+                              <Kanban className="size-3.5" />
+                              Kanban
+                            </Link>
+                          }
+                          variant="ghost"
+                          size="sm"
+                          className="cursor-pointer text-muted-foreground hover:text-foreground"
+                        />
+                      )}
                       <Button
                         render={
                           <Link href={`/dashboard/projects/${projectId}/features/${feature.id}`} className="gap-1">

@@ -37,6 +37,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 function MarkdownRenderer({ content }: { content: string }) {
   if (!content) return null;
@@ -150,6 +151,9 @@ export default function FeatureDetailPage({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRedesignConfirm, setShowRedesignConfirm] = useState(false);
+  const [isPrdEditDialogOpen, setIsPrdEditDialogOpen] = useState(false);
+  const [prdEditContent, setPrdEditContent] = useState("");
 
   const deleteMutation = trpc.features.delete.useMutation({
     onSuccess: () => {
@@ -160,6 +164,46 @@ export default function FeatureDetailPage({
 
   const handleDeleteConfirm = () => {
     deleteMutation.mutate({ featureId });
+  };
+
+  const reopenDiscoveryMutation = trpc.features.reopenDiscovery.useMutation({
+    onSuccess: () => {
+      setShowRedesignConfirm(false);
+      refetchFeature();
+      refetchChats();
+      setActiveTab("chat");
+      toast.success("Discovery chat re-opened!");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to re-open discovery.");
+    }
+  });
+
+  const handleRedesignConfirm = () => {
+    reopenDiscoveryMutation.mutate({ featureId });
+  };
+
+  const updatePrdMutation = trpc.features.updatePrd.useMutation({
+    onSuccess: () => {
+      setIsPrdEditDialogOpen(false);
+      refetchFeature();
+      refetchChats();
+      toast.success("PRD updated and tasks regenerated!");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update PRD.");
+    }
+  });
+
+  const handleSavePrd = () => {
+    if (!prdEditContent.trim()) {
+      toast.error("PRD content cannot be empty.");
+      return;
+    }
+    updatePrdMutation.mutate({
+      featureId,
+      rawContent: prdEditContent.trim(),
+    });
   };
 
   useEffect(() => {
@@ -395,6 +439,18 @@ export default function FeatureDetailPage({
               </span>
             </div>
 
+            {feature.status !== "discovery" && feature.status !== "prd_generation" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-muted-foreground border-border hover:bg-accent cursor-pointer flex items-center gap-1.5 font-semibold"
+                onClick={() => setShowRedesignConfirm(true)}
+              >
+                <Sparkle className="size-3.5 text-primary" />
+                Redesign Feature
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -457,9 +513,23 @@ export default function FeatureDetailPage({
               {prdGenerated && (
                 <TabsContent value="prd" className="flex-1 mt-6">
                   <Card className="border-border bg-card shadow-sm h-full">
-                    <CardHeader className="border-b border-border/50 py-4 bg-muted/20">
-                      <CardTitle className="text-base font-bold text-foreground">Product Requirements Document</CardTitle>
-                      <CardDescription>Generated automatically by TheShip AI Product Agent</CardDescription>
+                    <CardHeader className="border-b border-border/50 py-4 bg-muted/20 flex flex-row items-center justify-between space-y-0">
+                      <div>
+                        <CardTitle className="text-base font-bold text-foreground">Product Requirements Document</CardTitle>
+                        <CardDescription>Generated automatically by TheShip AI Product Agent</CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer font-semibold flex items-center gap-1.5"
+                        onClick={() => {
+                          setPrdEditContent(feature.prd?.rawContent || "");
+                          setIsPrdEditDialogOpen(true);
+                        }}
+                      >
+                        <FileText className="size-3.5 text-primary" />
+                        Edit PRD
+                      </Button>
                     </CardHeader>
                     <CardContent className="p-6 overflow-y-auto max-h-[600px]">
                       {feature.prd?.rawContent ? (
@@ -1023,6 +1093,90 @@ export default function FeatureDetailPage({
               className="bg-destructive hover:bg-destructive/90 text-white cursor-pointer font-semibold"
             >
               {deleteMutation.isPending ? "Deleting..." : "Yes, Delete Feature"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Redesign Confirmation Dialog */}
+      <Dialog open={showRedesignConfirm} onOpenChange={setShowRedesignConfirm}>
+        <DialogContent className="border-border bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+              <Sparkle className="size-5 text-primary" />
+              Redesign Feature Specification
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm leading-relaxed mt-2">
+              Are you sure you want to redesign this feature?
+              <br /><br />
+              This will reset the feature status back to **Discovery** and re-open the AI chat.
+              All existing engineering tasks, compiled PRD documents, and specifications under the <code className="bg-muted px-1 py-0.5 rounded text-xs">.theship/</code> folder will be deleted.
+              <br /><br />
+              You can then chat with the AI Product Manager again to build the new PRD. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowRedesignConfirm(false)}
+              disabled={reopenDiscoveryMutation.isPending}
+              className="border-border cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleRedesignConfirm}
+              disabled={reopenDiscoveryMutation.isPending}
+              className="bg-primary text-primary-foreground hover:bg-primary/95 cursor-pointer font-semibold"
+            >
+              {reopenDiscoveryMutation.isPending ? "Resetting..." : "Yes, Redesign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit PRD Dialog */}
+      <Dialog open={isPrdEditDialogOpen} onOpenChange={setIsPrdEditDialogOpen}>
+        <DialogContent className="border-border bg-card max-w-3xl h-[85vh] flex flex-col">
+          <DialogHeader className="px-1">
+            <DialogTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+              <FileText className="size-5 text-primary" />
+              Edit Product Requirements Document (PRD)
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Directly edit the markdown specifications for this feature request. Saving will set the status back to **Planning**, automatically regenerate engineering tasks based on your new specifications, and update the GitHub files.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 py-2 overflow-hidden flex flex-col">
+            <Textarea
+              className="w-full flex-1 min-h-[300px] font-mono text-sm bg-background border-border p-4 resize-none focus-visible:ring-primary focus-visible:ring-1"
+              value={prdEditContent}
+              onChange={(e) => setPrdEditContent(e.target.value)}
+              disabled={updatePrdMutation.isPending}
+              placeholder="# Feature Name..."
+            />
+          </div>
+
+          <DialogFooter className="gap-2 px-1 mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPrdEditDialogOpen(false)}
+              disabled={updatePrdMutation.isPending}
+              className="border-border cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSavePrd}
+              disabled={updatePrdMutation.isPending}
+              className="bg-primary text-primary-foreground hover:bg-primary/95 cursor-pointer font-semibold"
+            >
+              {updatePrdMutation.isPending ? "Saving & Regenerating..." : "Save & Regenerate Tasks"}
             </Button>
           </DialogFooter>
         </DialogContent>

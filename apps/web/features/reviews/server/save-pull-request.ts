@@ -1,5 +1,7 @@
 import { PullRequestWebhookPayload } from "@/features/github/server/webhook-handler";
 import { prisma } from "@/lib/db";
+import { generateText } from "ai";
+import { openrouter } from "@/features/ai";
 
 
 function getAuthorLogin(
@@ -41,7 +43,10 @@ function matchKeywords(featureKeywords: string[], targetText: string): boolean {
   }
   
   const matchRatio = matches / featureKeywords.length;
-  return matches >= 2 && matchRatio >= 0.6;
+  if (featureKeywords.length === 1) {
+    return matches === 1;
+  }
+  return matches >= 2 || matchRatio >= 0.5;
 }
 
 async function findMatchingFeatureRequest(
@@ -52,7 +57,12 @@ async function findMatchingFeatureRequest(
 ): Promise<string | null> {
   const activeFeatures = await prisma.featureRequest.findMany({
     where: {
-      project: { repoFullName },
+      project: {
+        repoFullName: {
+          equals: repoFullName,
+          mode: "insensitive"
+        }
+      },
       status: { in: ["development", "planning", "ready_for_review"] },
     },
   });
@@ -65,6 +75,7 @@ async function findMatchingFeatureRequest(
   const normalizedTitle = prTitle.toLowerCase();
   const normalizedBody = prBody ? prBody.toLowerCase() : "";
 
+  // 1. Check direct feature ID match (e.g. branch name contains feature request cuid)
   for (const feature of activeFeatures) {
     const idLower = feature.id.toLowerCase();
     if (
@@ -76,6 +87,7 @@ async function findMatchingFeatureRequest(
     }
   }
 
+  // 2. Check exact slug match
   for (const feature of activeFeatures) {
     const featureSlug = slugify(feature.title);
     if (featureSlug && (normalizedBranch.includes(featureSlug) || normalizedTitle.includes(featureSlug))) {
@@ -83,6 +95,32 @@ async function findMatchingFeatureRequest(
     }
   }
 
+  // 3. Check Task ID match (if developers include task IDs in their branch name or PR description)
+  const words = [
+    ...branchName.split(/[\s/_-]+/),
+    ...prTitle.split(/[\s/_-]+/),
+    ...(prBody ? prBody.split(/[\s/_-]+/) : [])
+  ].filter(w => w.length >= 8); // CUIDs/IDs are usually at least 8 chars long
+
+  if (words.length > 0) {
+    const matchedTask = await prisma.task.findFirst({
+      where: {
+        id: { in: words },
+        project: {
+          repoFullName: {
+            equals: repoFullName,
+            mode: "insensitive"
+          }
+        }
+      },
+      select: { prd: { select: { featureRequestId: true } } }
+    });
+    if (matchedTask?.prd?.featureRequestId) {
+      return matchedTask.prd.featureRequestId;
+    }
+  }
+
+  // 4. Check keyword match (more robust for shorter titles now)
   for (const feature of activeFeatures) {
     const keywords = getKeywords(feature.title);
     if (
@@ -94,11 +132,54 @@ async function findMatchingFeatureRequest(
     }
   }
 
+  // 5. AI Semantic matching fallback (if we have multiple active features and simple keyword matches failed)
+  if (activeFeatures.length > 1) {
+    try {
+      const featureOptions = activeFeatures.map(f => ({
+        id: f.id,
+        title: f.title,
+        description: f.description
+      }));
+
+      const systemPrompt = `You are an AI engineering assistant. Your task is to match an incoming Pull Request to the most relevant Feature Request from a list of active features.
+If none of the features match the intent of the Pull Request, you MUST return "null".
+Only select a feature if there is a high-confidence match between the PR (title, branch, description) and the feature (title, description).
+Return ONLY the exact selected feature ID, or the word "null" if no feature matches. Do not include any explanation or markdown formatting.`;
+
+      const userPrompt = `Incoming Pull Request:
+- Title: ${prTitle}
+- Branch: ${branchName}
+- Description: ${prBody ?? "No description"}
+
+List of Active Features:
+${featureOptions.map(f => `- [ID: ${f.id}] Title: "${f.title}" | Description: "${f.description}"`).join("\n")}
+
+Respond with either the matching feature ID (e.g. "cm...") or "null":`;
+
+      const { text } = await generateText({
+        model: openrouter("openrouter/free"),
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 0.1,
+      });
+
+      const result = text.trim();
+      if (result && result !== "null" && featureOptions.some(f => f.id === result)) {
+        console.log(`[findMatchingFeatureRequest] AI resolved PR match to feature ID: ${result}`);
+        return result;
+      }
+    } catch (error) {
+      console.error("[findMatchingFeatureRequest] AI semantic matching failed:", error);
+    }
+  }
+
+  // 6. Fallback: single active "development" feature
   const devFeatures = activeFeatures.filter((f) => f.status === "development");
   if (devFeatures.length === 1) {
     return devFeatures[0].id;
   }
 
+  // 7. Fallback: single active feature overall
   if (activeFeatures.length === 1) {
     return activeFeatures[0].id;
   }

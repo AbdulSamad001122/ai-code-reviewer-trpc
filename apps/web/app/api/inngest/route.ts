@@ -7,6 +7,7 @@ import {
   onFeatureCreatedFunction,
   onFeatureChatReceivedFunction,
   onFeatureReleaseRejectedFunction,
+  onFeaturePrdUpdatedFunction,
 } from "@/features/features/server/discovery-workflow";
 import { syncFeatureGitFunction, syncGithubPushToKanbanFunction, deleteFeatureGitFunction, deleteProjectGitFunction } from "@/features/git-sync/server/git-sync-function";
 
@@ -19,6 +20,7 @@ export const { GET, POST, PUT } = serve({
     onFeatureCreatedFunction,
     onFeatureChatReceivedFunction,
     onFeatureReleaseRejectedFunction,
+    onFeaturePrdUpdatedFunction,
     syncFeatureGitFunction,
     syncGithubPushToKanbanFunction,
     deleteFeatureGitFunction,

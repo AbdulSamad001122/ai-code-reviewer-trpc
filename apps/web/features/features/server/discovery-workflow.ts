@@ -273,7 +273,8 @@ Does this give you enough detail to write the PRD? If not, what is the next sing
     });
 
     const prdData = await step.run("compile-prd", async () => {
-      const systemPrompt = `You are a Senior Product Manager. Your task is to generate a comprehensive Product Requirements Document (PRD) for the requested feature based on the requirements chat logs and the repository codebase context.
+      const systemPrompt = `You are a strict, professional Product Manager. Your task is to generate a comprehensive Product Requirements Document (PRD) for the requested feature based STRICTLY on the requirements chat logs and the repository codebase context.
+CRITICAL INSTRUCTION: Do NOT invent, assume, or add any goals, requirements, integrations, user stories, or acceptance criteria that were not explicitly discussed, mentioned, or agreed upon in the chat logs. Stay 100% true only to the data gathered from the user. For example, do not add external database syncs, third-party auth, or CMS integrations unless the user explicitly requested them in the chat.
 You must reply ONLY with a JSON object in this format:
 {
   "problemStatement": string,
@@ -298,6 +299,19 @@ ${codebaseSnippets.join("\n\n")}`;
     });
 
     const prd = await step.run("save-prd-and-advance", async () => {
+      // Clean up any existing PRD and tasks to prevent duplicates or unique constraint failures on recreate
+      const existingPrd = await prisma.pRD.findUnique({
+        where: { featureRequestId }
+      });
+      if (existingPrd) {
+        await prisma.task.deleteMany({
+          where: { prdId: existingPrd.id }
+        });
+        await prisma.pRD.delete({
+          where: { id: existingPrd.id }
+        });
+      }
+
       const prdObj = await prisma.pRD.create({
         data: {
           featureRequestId,
@@ -329,7 +343,8 @@ ${codebaseSnippets.join("\n\n")}`;
     });
 
     const tasks = await step.run("generate-engineering-tasks", async () => {
-      const systemPrompt = `You are a Technical Lead. Your task is to break down a Product Requirements Document (PRD) into a list of actionable, technical engineering tasks.
+      const systemPrompt = `You are a strict Technical Lead. Your task is to break down a Product Requirements Document (PRD) into a list of actionable, technical engineering tasks.
+CRITICAL INSTRUCTION: Generate tasks ONLY for the features and requirements explicitly defined in the goals and acceptance criteria of this PRD. Do NOT invent or add any extra tasks, database schemas, integrations, or features (such as CMS fetching, analytics, or complex backend systems) unless they are directly specified in the PRD. Keep tasks simple and strictly aligned with the PRD.
 You must reply ONLY with a JSON array in this format:
 [
   {
@@ -542,3 +557,101 @@ Identify 1-3 new technical engineering tasks that the developers/agents must com
   }
 );
 
+export const onFeaturePrdUpdatedFunction = inngest.createFunction(
+  {
+    id: "on-feature-prd-updated",
+    triggers: { event: "app/feature.prd_updated" },
+  },
+  async ({ event, step }) => {
+    const { featureId, rawContent } = event.data;
+
+    const featureRequest = await step.run("fetch-feature-details", async () => {
+      const feat = await prisma.featureRequest.findUnique({
+        where: { id: featureId },
+        include: { prd: true },
+      });
+      if (!feat) throw new Error("Feature request not found");
+      return feat;
+    });
+
+    const newTasks = await step.run("generate-tasks-from-edited-prd", async () => {
+      const systemPrompt = `You are a strict Technical Lead. Your task is to break down a Product Requirements Document (PRD) into a list of actionable, technical engineering tasks.
+CRITICAL INSTRUCTION: Generate tasks ONLY for the features and requirements explicitly defined in the goals and acceptance criteria of this PRD. Do NOT invent or add any extra tasks, database schemas, integrations, or features (such as CMS fetching, analytics, or complex backend systems) unless they are directly specified in the PRD. Keep tasks simple and strictly aligned with the PRD.
+You must reply ONLY with a JSON array in this format:
+[
+  {
+    "title": "string",
+    "description": "string"
+  }
+]
+Do not include any other text outside the JSON array.`;
+
+      const userPrompt = `Feature Request: ${featureRequest.title}
+PRD Markdown Content:
+${rawContent}
+
+Break this down into 3-6 clear, actionable development tasks.`;
+
+      const text = await generateTextWithRetry(systemPrompt, userPrompt);
+
+      try {
+        const start = text.indexOf("[");
+        const end = text.lastIndexOf("]");
+        if (start === -1 || end === -1) {
+          throw new Error("No JSON array found in response");
+        }
+        const jsonStr = text.substring(start, end + 1);
+        return JSON.parse(jsonStr) as { title: string; description: string }[];
+      } catch (error) {
+        console.error("Failed to parse regenerated tasks list. Raw response was:", text);
+        return [
+          {
+            title: `Implement ${featureRequest.title} Specifications`,
+            description: "Complete all features and requirements defined in the updated PRD.",
+          },
+        ];
+      }
+    });
+
+    await step.run("save-regenerated-tasks", async () => {
+      if (featureRequest.prd) {
+        // Delete old tasks linked to this PRD
+        await prisma.task.deleteMany({
+          where: { prdId: featureRequest.prd.id },
+        });
+
+        const tasksToCreate = newTasks.map((task) => ({
+          projectId: featureRequest.projectId,
+          prdId: featureRequest.prd!.id,
+          title: task.title,
+          description: task.description,
+          status: "todo",
+        }));
+
+        for (const t of tasksToCreate) {
+          await prisma.task.create({ data: t });
+        }
+      }
+    });
+
+    await step.run("trigger-git-sync", async () => {
+      await inngest.send({
+        name: "app/git_sync.requested",
+        data: { featureId }
+      });
+    });
+
+    await step.run("log-update-chat", async () => {
+      const tasksListText = newTasks.map((t) => `- **${t.title}**`).join("\n");
+      await prisma.featureRequestChat.create({
+        data: {
+          featureRequestId: featureId,
+          sender: "ai",
+          message: `🔄 **PRD Updated Manually & Tasks Regenerated!**\n\nThe specifications have been updated. I have regenerated the engineering tasks on your Kanban board:\n${tasksListText}\n\nI have also synced the updated PRD and tasks directly to the \`.theship/\` directory in your GitHub repository. The feature is in the **Planning** phase.`,
+        },
+      });
+    });
+
+    return { success: true, featureId };
+  }
+);

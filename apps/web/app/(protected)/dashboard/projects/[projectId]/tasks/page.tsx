@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { trpc } from "@/trpc/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +62,24 @@ interface Column {
 }
 
 export default function KanbanPage({ params }: { params: Promise<{ projectId: string }> }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center p-6 min-h-[400px]">
+          <Spinner className="size-8" />
+        </div>
+      }
+    >
+      <KanbanPageContent params={params} />
+    </Suspense>
+  );
+}
+
+function KanbanPageContent({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params);
+  const searchParams = useSearchParams();
+  const urlFeatureId = searchParams.get("featureId") || "all";
+
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -69,6 +87,13 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedFeatureFilter, setSelectedFeatureFilter] = useState<string>("all");
+
+  useEffect(() => {
+    if (urlFeatureId) {
+      setSelectedFeatureFilter(urlFeatureId);
+    }
+  }, [urlFeatureId]);
 
   const { data: project, isLoading: isLoadingProject } = trpc.project.get.useQuery({ projectId });
 
@@ -108,6 +133,18 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
   const planningFeatures = features.filter((f) => f.status === "planning");
 
   const prdLinkedFeatures = features.filter((f) => f.prd !== null && f.prd !== undefined);
+
+  const filteredTasks = tasks.filter((task) => {
+    if (selectedFeatureFilter === "all") return true;
+    if (selectedFeatureFilter === "none") return !task.prdId;
+    return task.prdId === selectedFeatureFilter;
+  });
+
+  const filteredPlanningFeatures = planningFeatures.filter((f) => {
+    if (selectedFeatureFilter === "all") return true;
+    if (selectedFeatureFilter === "none") return false;
+    return f.prd?.id === selectedFeatureFilter;
+  });
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,107 +256,128 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger
-            render={
-              <Button className="cursor-pointer gap-2 bg-primary text-primary-foreground font-semibold">
-                <Plus className="size-4" />
-                New Task
-              </Button>
-            }
-          />
-          <DialogContent className="border-border bg-card max-w-lg">
-            <form onSubmit={handleCreateTask}>
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold">Create Kanban Task</DialogTitle>
-                <DialogDescription>
-                  Add a manual task to your project timeline. You can optionally link it to a feature requirement specification.
-                </DialogDescription>
-              </DialogHeader>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider hidden md:inline shrink-0">
+              Filter by Feature:
+            </span>
+            <select
+              value={selectedFeatureFilter}
+              onChange={(e) => setSelectedFeatureFilter(e.target.value)}
+              className="flex h-9 w-[200px] rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground cursor-pointer font-semibold"
+            >
+              <option value="all">✨ All Features</option>
+              <option value="none">🛠️ General Tasks (No Link)</option>
+              {prdLinkedFeatures.map((f) => (
+                <option key={f.id} value={f.prd?.id}>
+                  📋 {f.title}
+                </option>
+              ))}
+            </select>
+          </div>
 
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label htmlFor="task-title" className="text-sm font-medium">
-                    Task Title
-                  </label>
-                  <Input
-                    id="task-title"
-                    placeholder="e.g. Set up API endpoints for billing"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    disabled={isSubmitting}
-                    className="border-border bg-background"
-                  />
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger
+              render={
+                <Button className="cursor-pointer gap-2 bg-primary text-primary-foreground font-semibold h-9">
+                  <Plus className="size-4" />
+                  New Task
+                </Button>
+              }
+            />
+            <DialogContent className="border-border bg-card max-w-lg">
+              <form onSubmit={handleCreateTask}>
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">Create Kanban Task</DialogTitle>
+                  <DialogDescription>
+                    Add a manual task to your project timeline. You can optionally link it to a feature requirement specification.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label htmlFor="task-title" className="text-sm font-medium">
+                      Task Title
+                    </label>
+                    <Input
+                      id="task-title"
+                      placeholder="e.g. Set up API endpoints for billing"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      required
+                      disabled={isSubmitting}
+                      className="border-border bg-background"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="task-desc" className="text-sm font-medium">
+                      Description (Optional)
+                    </label>
+                    <Textarea
+                      id="task-desc"
+                      placeholder="Detail the technical specifications or requirements..."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      disabled={isSubmitting}
+                      className="border-border bg-background min-h-[100px]"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="linked-prd" className="text-sm font-medium">
+                      Link to Feature PRD (Optional)
+                    </label>
+                    <select
+                      id="linked-prd"
+                      value={selectedPrdId}
+                      onChange={(e) => setSelectedPrdId(e.target.value)}
+                      disabled={isSubmitting}
+                      className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="none">General Project Task (No Link)</option>
+                      {prdLinkedFeatures.map((f) => (
+                        <option key={f.id} value={f.prd?.id}>
+                          {f.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {createTaskMutation.isError && (
+                    <p className="text-sm text-destructive font-medium">
+                      {createTaskMutation.error.message || "Failed to create task."}
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="task-desc" className="text-sm font-medium">
-                    Description (Optional)
-                  </label>
-                  <Textarea
-                    id="task-desc"
-                    placeholder="Detail the technical specifications or requirements..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOpen(false)}
                     disabled={isSubmitting}
-                    className="border-border bg-background min-h-[100px]"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="linked-prd" className="text-sm font-medium">
-                    Link to Feature PRD (Optional)
-                  </label>
-                  <select
-                    id="linked-prd"
-                    value={selectedPrdId}
-                    onChange={(e) => setSelectedPrdId(e.target.value)}
-                    disabled={isSubmitting}
-                    className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-border cursor-pointer"
                   >
-                    <option value="none">General Project Task (No Link)</option>
-                    {prdLinkedFeatures.map((f) => (
-                      <option key={f.id} value={f.prd?.id}>
-                        {f.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {createTaskMutation.isError && (
-                  <p className="text-sm text-destructive font-medium">
-                    {createTaskMutation.error.message || "Failed to create task."}
-                  </p>
-                )}
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                  disabled={isSubmitting}
-                  className="border-border cursor-pointer"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={!title.trim() || isSubmitting}
-                  className="bg-primary text-primary-foreground cursor-pointer"
-                >
-                  {isSubmitting ? "Creating..." : "Create Task"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={!title.trim() || isSubmitting}
+                    className="bg-primary text-primary-foreground cursor-pointer"
+                  >
+                    {isSubmitting ? "Creating..." : "Create Task"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {planningFeatures.length > 0 && (
+      {filteredPlanningFeatures.length > 0 && (
         <div className="flex flex-col gap-4">
-          {planningFeatures.map((feature) => (
+          {filteredPlanningFeatures.map((feature) => (
             <Alert
               key={feature.id}
               className="border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-4"
@@ -355,7 +413,7 @@ export default function KanbanPage({ params }: { params: Promise<{ projectId: st
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 items-start">
         {columns.map((column) => {
-          const columnTasks = tasks.filter((t) => t.status === column.id);
+          const columnTasks = filteredTasks.filter((t) => t.status === column.id);
 
           return (
             <div

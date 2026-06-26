@@ -6,7 +6,7 @@ import { getPineconeIndex } from "@/features/pinecone/client";
 import { buildRepoNamespace } from "@/features/repo-sync/server/repo-sync";
 import { searchPrContext } from "@/features/reviews/server/vector";
 
-const MODEL_NAME = "openrouter/free";
+const MODEL_NAME = process.env.AI_MODEL || "openrouter/free";
 
 type SufficiencyResponse = {
   sufficient: boolean;

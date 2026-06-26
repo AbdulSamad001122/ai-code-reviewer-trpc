@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { openrouter } from "@/features/ai";
 
-const REVIEW_MODEL = "openrouter/free";
+const REVIEW_MODEL = process.env.AI_MODEL || "openrouter/free";
 
 const SYSTEM_PROMPT = `You are a Staff-Level Software Engineer and Security Reviewer performing a production-grade pull request review.
 

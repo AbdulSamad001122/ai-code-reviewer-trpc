@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { generateText } from "ai";
 import { openrouter } from "@/features/ai";
 
+const MODEL_NAME = process.env.AI_MODEL || "openrouter/free";
+
 
 function getAuthorLogin(
     user: { login: string } | null
@@ -157,7 +159,7 @@ ${featureOptions.map(f => `- [ID: ${f.id}] Title: "${f.title}" | Description: "$
 Respond with either the matching feature ID (e.g. "cm...") or "null":`;
 
       const { text } = await generateText({
-        model: openrouter("openrouter/free"),
+        model: openrouter(MODEL_NAME),
         system: systemPrompt,
         prompt: userPrompt,
         temperature: 0.1,

@@ -27,3 +27,5 @@ export const { GET, POST, PUT } = serve({
     deleteProjectGitFunction,
   ],
 });
+
+export const maxDuration = 60;

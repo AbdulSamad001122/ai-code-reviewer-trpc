@@ -363,10 +363,11 @@ function KanbanPageContent({ params }: { params: Promise<{ projectId: string }> 
                   </Button>
                   <Button
                     type="submit"
-                    disabled={!title.trim() || isSubmitting}
+                    loading={isSubmitting}
+                    disabled={!title.trim()}
                     className="bg-primary text-primary-foreground cursor-pointer"
                   >
-                    {isSubmitting ? "Creating..." : "Create Task"}
+                    Create Task
                   </Button>
                 </DialogFooter>
               </form>
@@ -394,17 +395,10 @@ function KanbanPageContent({ params }: { params: Promise<{ projectId: string }> 
               </div>
               <Button
                 onClick={() => handleApprovePlan(feature.id)}
-                disabled={approvePlanMutation.isPending}
+                loading={approvePlanMutation.isPending && approvePlanMutation.variables?.featureId === feature.id}
                 className="cursor-pointer bg-amber-600 text-white hover:bg-amber-700 font-semibold shadow-xs shrink-0 self-stretch sm:self-auto text-center"
               >
-                {approvePlanMutation.isPending && approvePlanMutation.variables?.featureId === feature.id ? (
-                  <>
-                    <Spinner className="mr-2 size-4 inline animate-spin text-white" />
-                    Processing...
-                  </>
-                ) : (
-                  "Approve Plan & Start Development"
-                )}
+                Approve Plan & Start Development
               </Button>
             </Alert>
           ))}

@@ -78,10 +78,10 @@ const SyncRepoButton = ({
     <Button
       size="sm"
       variant="outline"
-      disabled={syncing}
+      loading={syncing}
       onClick={() => syncRepo.mutate({ repoFullName, branch })}
     >
-      {getButtonLabel(syncStatus, syncRepo.isPending)}
+      {syncStatus === "synced" ? "Re-sync" : "Sync"}
     </Button>
   );
 };

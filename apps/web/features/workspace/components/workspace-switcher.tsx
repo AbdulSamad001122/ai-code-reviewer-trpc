@@ -143,10 +143,11 @@ export function WorkspaceSwitcher() {
               </Button>
               <Button
                 type="submit"
-                disabled={!name.trim() || createWorkspaceMutation.isPending}
+                loading={createWorkspaceMutation.isPending}
+                disabled={!name.trim()}
                 className="bg-primary text-primary-foreground cursor-pointer"
               >
-                {createWorkspaceMutation.isPending ? "Creating..." : "Create Workspace"}
+                Create Workspace
               </Button>
             </DialogFooter>
           </form>

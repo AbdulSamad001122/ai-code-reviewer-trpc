@@ -598,4 +598,55 @@ export const featuresRouter = router({
 
       return updatedFeature;
     }),
+
+  skipQuestion: protectedProcedure
+    .input(
+      z.object({
+        featureId: z.string(),
+        reason: z.string().optional().nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const feature = await prisma.featureRequest.findUnique({
+        where: { id: input.featureId },
+        select: { projectId: true, project: { select: { workspaceId: true } } },
+      });
+
+      if (!feature) {
+        throw new Error("Feature request not found");
+      }
+
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: feature.project.workspaceId,
+            userId: ctx.user.id,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new Error("Unauthorized workspace access");
+      }
+
+      const skipMessage = `[Skip Single Question] ${input.reason || "I want to skip this question."}`;
+      await prisma.featureRequestChat.create({
+        data: {
+          featureRequestId: input.featureId,
+          sender: "user",
+          message: skipMessage,
+        },
+      });
+
+      try {
+        await inngest.send({
+          name: "app/feature.chat_received",
+          data: { featureRequestId: input.featureId },
+        });
+      } catch (error) {
+        console.error("Failed to trigger Inngest event for app/feature.chat_received during skip:", error);
+      }
+
+      return { success: true };
+    }),
 });

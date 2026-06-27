@@ -140,7 +140,11 @@ export default function SettingsPage() {
             {plan === "starter" ? (
               <Button disabled variant="outline" className="w-full">Active</Button>
             ) : (
-              <Button onClick={() => handleUpgrade("starter")} className="w-full group" disabled={checkoutMutation.isPending}>
+              <Button
+                onClick={() => handleUpgrade("starter")}
+                className="w-full group"
+                loading={checkoutMutation.isPending && checkoutMutation.variables?.variant === "starter"}
+              >
                 Upgrade to Starter <ArrowUpRight className="ml-1 size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Button>
             )}
@@ -180,7 +184,11 @@ export default function SettingsPage() {
             {plan === "unlimited" ? (
               <Button disabled variant="outline" className="w-full">Active</Button>
             ) : (
-              <Button onClick={() => handleUpgrade("unlimited")} className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold group" disabled={checkoutMutation.isPending}>
+              <Button
+                onClick={() => handleUpgrade("unlimited")}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold group"
+                loading={checkoutMutation.isPending && checkoutMutation.variables?.variant === "unlimited"}
+              >
                 Upgrade to Unlimited <ArrowUpRight className="ml-1 size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Button>
             )}

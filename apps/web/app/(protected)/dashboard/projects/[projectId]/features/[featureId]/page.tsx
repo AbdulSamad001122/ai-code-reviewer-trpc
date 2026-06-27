@@ -42,6 +42,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function MarkdownRenderer({ content }: { content: string }) {
   if (!content) return null;
 
@@ -98,7 +107,7 @@ function MarkdownRenderer({ content }: { content: string }) {
           return <div key={idx} className="h-2" />;
         }
 
-        let htmlContent = line;
+        let htmlContent = escapeHtml(line);
         const boldRegex = /\*\*(.*?)\*\*/g;
         htmlContent = htmlContent.replace(boldRegex, "<strong>$1</strong>");
 
@@ -120,7 +129,7 @@ function ChatMessageRenderer({ content, isUser }: { content: string; isUser: boo
   return (
     <div className={`space-y-1.5 ${isUser ? "text-primary-foreground" : "text-foreground"}`}>
       {lines.map((line, idx) => {
-        let htmlContent = line;
+        let htmlContent = escapeHtml(line);
         const boldRegex = /\*\*(.*?)\*\*/g;
         htmlContent = htmlContent.replace(boldRegex, "<strong>$1</strong>");
         return (
@@ -854,14 +863,11 @@ export default function FeatureDetailPage({
                         <Button
                           type="submit"
                           size="icon"
-                          disabled={(!isSkippingSingle && !message.trim()) || sendMessageMutation.isPending}
+                          loading={sendMessageMutation.isPending}
+                          disabled={!isSkippingSingle && !message.trim()}
                           className="cursor-pointer bg-primary text-primary-foreground"
                         >
-                          {sendMessageMutation.isPending ? (
-                            <Spinner className="size-4" />
-                          ) : (
-                            <PaperPlaneRight className="size-4" />
-                          )}
+                          <PaperPlaneRight className="size-4" />
                         </Button>
                       </form>
                       
@@ -1059,10 +1065,10 @@ export default function FeatureDetailPage({
             </Button>
             <Button
               onClick={handleApproveRelease}
-              disabled={approveReleaseMutation.isPending}
+              loading={approveReleaseMutation.isPending}
               className="bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer font-semibold"
             >
-              {approveReleaseMutation.isPending ? "Shipping..." : "Approve & Ship"}
+              Approve & Ship
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1105,10 +1111,10 @@ export default function FeatureDetailPage({
               </Button>
               <Button
                 type="submit"
-                disabled={rejectReleaseMutation.isPending}
+                loading={rejectReleaseMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer font-semibold"
               >
-                {rejectReleaseMutation.isPending ? "Processing..." : "Reject & Send Back"}
+                Reject & Send Back
               </Button>
             </DialogFooter>
           </form>
@@ -1149,10 +1155,10 @@ export default function FeatureDetailPage({
             <Button
               type="button"
               onClick={handleDeleteConfirm}
-              disabled={deleteMutation.isPending}
+              loading={deleteMutation.isPending}
               className="bg-destructive hover:bg-destructive/90 text-white cursor-pointer font-semibold"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Yes, Delete Feature"}
+              Yes, Delete Feature
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1188,10 +1194,10 @@ export default function FeatureDetailPage({
             <Button
               type="button"
               onClick={handleRedesignConfirm}
-              disabled={reopenDiscoveryMutation.isPending}
+              loading={reopenDiscoveryMutation.isPending}
               className="bg-primary text-primary-foreground hover:bg-primary/95 cursor-pointer font-semibold"
             >
-              {reopenDiscoveryMutation.isPending ? "Resetting..." : "Yes, Redesign"}
+              Yes, Redesign
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1233,10 +1239,10 @@ export default function FeatureDetailPage({
             <Button
               type="button"
               onClick={handleSavePrd}
-              disabled={updatePrdMutation.isPending}
+              loading={updatePrdMutation.isPending}
               className="bg-primary text-primary-foreground hover:bg-primary/95 cursor-pointer font-semibold"
             >
-              {updatePrdMutation.isPending ? "Saving & Regenerating..." : "Save & Regenerate Tasks"}
+              Save & Regenerate Tasks
             </Button>
           </DialogFooter>
         </DialogContent>

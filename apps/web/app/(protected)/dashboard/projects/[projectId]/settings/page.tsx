@@ -55,7 +55,7 @@ export default function ProjectSettingsPage({ params }: { params: Promise<{ proj
     );
   }
 
-  const isDeleteDisabled = deleteConfirmationText !== project.name || deleteProjectMutation.isPending;
+  const isDeleteDisabled = deleteConfirmationText !== project.name;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 max-w-4xl mx-auto">
@@ -181,17 +181,11 @@ export default function ProjectSettingsPage({ params }: { params: Promise<{ proj
             <Button
               variant="destructive"
               onClick={handleDelete}
+              loading={deleteProjectMutation.isPending}
               disabled={isDeleteDisabled}
               className="font-bold cursor-pointer"
             >
-              {deleteProjectMutation.isPending ? (
-                <>
-                  <Spinner className="size-3.5 mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                "Permanently Delete"
-              )}
+              Permanently Delete
             </Button>
           </DialogFooter>
         </DialogContent>

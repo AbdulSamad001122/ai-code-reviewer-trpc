@@ -205,10 +205,11 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!title.trim() || !description.trim() || isSubmitting}
+                  loading={isSubmitting}
+                  disabled={!title.trim() || !description.trim()}
                   className="bg-primary text-primary-foreground cursor-pointer"
                 >
-                  {isSubmitting ? "Submitting..." : "Start Discovery"}
+                  Start Discovery
                 </Button>
               </DialogFooter>
             </form>
@@ -356,10 +357,10 @@ export default function FeaturesPage({ params }: { params: Promise<{ projectId: 
             <Button
               type="button"
               onClick={handleDeleteConfirm}
-              disabled={isDeleting}
+              loading={isDeleting}
               className="bg-destructive hover:bg-destructive/90 text-white cursor-pointer font-semibold"
             >
-              {isDeleting ? "Deleting..." : "Yes, Delete Feature"}
+              Yes, Delete Feature
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -225,10 +225,11 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated?: (
             </Button>
             <Button
               type="submit"
-              disabled={!name.trim() || !repoFullName || isSubmitting}
+              loading={isSubmitting}
+              disabled={!name.trim() || !repoFullName}
               className="bg-primary text-primary-foreground cursor-pointer"
             >
-              {isSubmitting ? "Creating..." : "Link Project"}
+              Link Project
             </Button>
           </DialogFooter>
         </form>

@@ -60,9 +60,10 @@ export function CreateWorkspaceOverlay() {
             <Button
               type="submit"
               className="w-full cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-              disabled={!name.trim() || createWorkspaceMutation.isPending}
+              loading={createWorkspaceMutation.isPending}
+              disabled={!name.trim()}
             >
-              {createWorkspaceMutation.isPending ? "Creating Workspace..." : "Create Workspace"}
+              Create Workspace
             </Button>
           </CardFooter>
         </form>

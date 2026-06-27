@@ -16,23 +16,21 @@ export async function GET() {
     ],
     tags: [
       { name: "System", description: "Health checks and general configurations" },
-      { name: "Workspaces", description: "Workspace management" },
-      { name: "Projects", description: "Project creation, repo linkage, and deletions" },
-      { name: "Features", description: "AI PM chat discovery, PRD generation, and release center actions" },
-      { name: "Tasks", description: "Kanban board tasks management" },
-      { name: "Billing", description: "Stripe checkout and subscription info" },
-      { name: "Webhooks", description: "GitHub and Stripe webhook endpoints" },
+      { name: "Workspaces", description: "Workspace and team membership management" },
+      { name: "Projects", description: "Project creation, repository sync, and integrations" },
+      { name: "Features", description: "AI PM chat discovery, specifications (PRDs), and feature release center" },
+      { name: "Tasks", description: "Kanban board task tracking and development phase approvals" },
+      { name: "Billing", description: "Lemon Squeezy checkout and subscription management" },
+      { name: "Webhooks", description: "GitHub and Lemon Squeezy webhook integration routes" },
     ],
     paths: {
       "/trpc/health": {
         get: {
           tags: ["System"],
           summary: "Health Check",
-          description: "Check if the backend tRPC service is running.",
+          description: "Verify if the backend tRPC API service is online and running.",
           responses: {
-            200: {
-              description: "System is healthy.",
-            },
+            200: { description: "System is healthy." },
           },
         },
       },
@@ -40,11 +38,9 @@ export async function GET() {
         get: {
           tags: ["Workspaces"],
           summary: "List Workspaces",
-          description: "Retrieve all workspaces the user is part of.",
+          description: "Retrieve all workspaces the authenticated user belongs to.",
           responses: {
-            200: {
-              description: "List of workspaces.",
-            },
+            200: { description: "List of workspaces." },
           },
         },
       },
@@ -52,7 +48,7 @@ export async function GET() {
         post: {
           tags: ["Workspaces"],
           summary: "Create Workspace",
-          description: "Create a new workspace inside the platform.",
+          description: "Provision a new workspace.",
           requestBody: {
             required: true,
             content: {
@@ -68,9 +64,26 @@ export async function GET() {
             },
           },
           responses: {
-            200: {
-              description: "Workspace created successfully.",
+            200: { description: "Workspace created successfully." },
+          },
+        },
+      },
+      "/trpc/workspace.getMembers": {
+        get: {
+          tags: ["Workspaces"],
+          summary: "Get Workspace Members",
+          description: "List all users who are members of the workspace and their roles.",
+          parameters: [
+            {
+              name: "input",
+              in: "query",
+              required: true,
+              description: "URL-encoded JSON input, e.g. `{\"workspaceId\":\"workspace-id\"}`",
+              schema: { type: "string" },
             },
+          ],
+          responses: {
+            200: { description: "List of workspace members." },
           },
         },
       },
@@ -78,30 +91,26 @@ export async function GET() {
         get: {
           tags: ["Projects"],
           summary: "List Workspace Projects",
-          description: "Retrieve all projects within a specified workspace.",
+          description: "Retrieve linked repositories and projects within a workspace.",
           parameters: [
             {
               name: "input",
               in: "query",
               required: true,
               description: "URL-encoded JSON input, e.g. `{\"workspaceId\":\"workspace-id\"}`",
-              schema: {
-                type: "string",
-              },
+              schema: { type: "string" },
             },
           ],
           responses: {
-            200: {
-              description: "List of workspace projects.",
-            },
+            200: { description: "List of workspace projects." },
           },
         },
       },
       "/trpc/project.create": {
         post: {
           tags: ["Projects"],
-          summary: "Create Project",
-          description: "Link a GitHub repository to a workspace as a new project.",
+          summary: "Link Project",
+          description: "Import a GitHub repository into the workspace as a new project.",
           requestBody: {
             required: true,
             content: {
@@ -121,9 +130,26 @@ export async function GET() {
             },
           },
           responses: {
-            200: {
-              description: "Project linked successfully.",
+            200: { description: "Project linked successfully." },
+          },
+        },
+      },
+      "/trpc/project.get": {
+        get: {
+          tags: ["Projects"],
+          summary: "Get Project Details",
+          description: "Fetch details of a single project by its ID.",
+          parameters: [
+            {
+              name: "input",
+              in: "query",
+              required: true,
+              description: "URL-encoded JSON input, e.g. `{\"projectId\":\"project-id\"}`",
+              schema: { type: "string" },
             },
+          ],
+          responses: {
+            200: { description: "Project details." },
           },
         },
       },
@@ -131,7 +157,7 @@ export async function GET() {
         post: {
           tags: ["Projects"],
           summary: "Delete Project",
-          description: "Delete a project, unlinking files and triggering background cleanup.",
+          description: "Delete a project, unlinking files and triggering repository metadata cleanups.",
           requestBody: {
             required: true,
             content: {
@@ -147,9 +173,70 @@ export async function GET() {
             },
           },
           responses: {
-            200: {
-              description: "Project deletion scheduled.",
+            200: { description: "Project deletion scheduled." },
+          },
+        },
+      },
+      "/trpc/github.getInstallationStatus": {
+        get: {
+          tags: ["Projects"],
+          summary: "Get GitHub Connection Status",
+          description: "Verify if the workspace's GitHub App link is active.",
+          responses: {
+            200: { description: "Connection status details." },
+          },
+        },
+      },
+      "/trpc/github.disconnectApp": {
+        post: {
+          tags: ["Projects"],
+          summary: "Disconnect GitHub App",
+          description: "Unlink the GitHub App installation from the authenticated user's workspace.",
+          responses: {
+            200: { description: "GitHub App disconnected." },
+          },
+        },
+      },
+      "/trpc/github.getRepos": {
+        get: {
+          tags: ["Projects"],
+          summary: "Get Installed Repositories",
+          description: "Fetch repositories allowed by the GitHub App installation.",
+          parameters: [
+            {
+              name: "input",
+              in: "query",
+              required: true,
+              description: "URL-encoded JSON input, e.g. `{\"page\":1}`",
+              schema: { type: "string" },
             },
+          ],
+          responses: {
+            200: { description: "List of repositories." },
+          },
+        },
+      },
+      "/trpc/repoSync.sync": {
+        post: {
+          tags: ["Projects"],
+          summary: "Sync Repository Context",
+          description: "Manually trigger parsing and vector indexing of codebase context.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    repoFullName: { type: "string" },
+                  },
+                  required: ["repoFullName"],
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: "Sync request dispatched." },
           },
         },
       },
@@ -164,15 +251,11 @@ export async function GET() {
               in: "query",
               required: true,
               description: "URL-encoded JSON input, e.g. `{\"projectId\":\"project-id\"}`",
-              schema: {
-                type: "string",
-              },
+              schema: { type: "string" },
             },
           ],
           responses: {
-            200: {
-              description: "List of features.",
-            },
+            200: { description: "List of features." },
           },
         },
       },
@@ -180,7 +263,7 @@ export async function GET() {
         post: {
           tags: ["Features"],
           summary: "Create Feature",
-          description: "Submit a new feature request, initializing the AI PM discovery flow.",
+          description: "Submit a new feature request, initiating the AI PM discovery flow.",
           requestBody: {
             required: true,
             content: {
@@ -198,9 +281,45 @@ export async function GET() {
             },
           },
           responses: {
-            200: {
-              description: "Feature request created successfully.",
+            200: { description: "Feature request created successfully." },
+          },
+        },
+      },
+      "/trpc/features.get": {
+        get: {
+          tags: ["Features"],
+          summary: "Get Feature Details",
+          description: "Fetch details of a single feature request, including PRD specifications and links.",
+          parameters: [
+            {
+              name: "input",
+              in: "query",
+              required: true,
+              description: "URL-encoded JSON input, e.g. `{\"featureId\":\"feature-id\"}`",
+              schema: { type: "string" },
             },
+          ],
+          responses: {
+            200: { description: "Feature details." },
+          },
+        },
+      },
+      "/trpc/features.getChat": {
+        get: {
+          tags: ["Features"],
+          summary: "Get Discovery Chat Logs",
+          description: "Retrieve the requirements-discovery dialogue for a feature request.",
+          parameters: [
+            {
+              name: "input",
+              in: "query",
+              required: true,
+              description: "URL-encoded JSON input, e.g. `{\"featureId\":\"feature-id\"}`",
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            200: { description: "Discovery chat logs." },
           },
         },
       },
@@ -208,7 +327,7 @@ export async function GET() {
         post: {
           tags: ["Features"],
           summary: "Send Message to AI PM",
-          description: "Send a chat message to the AI PM to clarify requirements during discovery.",
+          description: "Send a chat message to clarify requirements during AI PM discovery.",
           requestBody: {
             required: true,
             content: {
@@ -225,9 +344,7 @@ export async function GET() {
             },
           },
           responses: {
-            200: {
-              description: "Message sent and processed.",
-            },
+            200: { description: "Message sent and processed." },
           },
         },
       },
@@ -252,9 +369,129 @@ export async function GET() {
             },
           },
           responses: {
-            200: {
-              description: "Bypassed current question.",
+            200: { description: "Bypassed current question." },
+          },
+        },
+      },
+      "/trpc/features.approveRelease": {
+        post: {
+          tags: ["Features"],
+          summary: "Approve Release",
+          description: "Approve a feature in ready_for_review status and mark it as completed.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    featureId: { type: "string" },
+                  },
+                  required: ["featureId"],
+                },
+              },
             },
+          },
+          responses: {
+            200: { description: "Release approved and feature status set to shipped." },
+          },
+        },
+      },
+      "/trpc/features.rejectRelease": {
+        post: {
+          tags: ["Features"],
+          summary: "Reject Release",
+          description: "Reject the release of a feature and demote it back to development phase with revision feedback.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    featureId: { type: "string" },
+                    reason: { type: "string" },
+                  },
+                  required: ["featureId", "reason"],
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: "Release rejected and feature sent back to planning with updates." },
+          },
+        },
+      },
+      "/trpc/features.delete": {
+        post: {
+          tags: ["Features"],
+          summary: "Delete Feature Request",
+          description: "Deletes a feature request and triggers cleanups of task boards and Git specification folders.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    featureId: { type: "string" },
+                  },
+                  required: ["featureId"],
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: "Feature request deleted." },
+          },
+        },
+      },
+      "/trpc/features.reopenDiscovery": {
+        post: {
+          tags: ["Features"],
+          summary: "Redesign Feature",
+          description: "Reset compiled feature specs back to discovery chat to begin specifications redesign.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    featureId: { type: "string" },
+                  },
+                  required: ["featureId"],
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: "Feature reset back to discovery." },
+          },
+        },
+      },
+      "/trpc/features.updatePrd": {
+        post: {
+          tags: ["Features"],
+          summary: "Manual PRD Edit",
+          description: "Directly modify a feature's raw PRD Markdown content and trigger engineering task updates.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    featureId: { type: "string" },
+                    rawContent: { type: "string" },
+                  },
+                  required: ["featureId", "rawContent"],
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: "PRD updated successfully." },
           },
         },
       },
@@ -269,15 +506,38 @@ export async function GET() {
               in: "query",
               required: true,
               description: "URL-encoded JSON input, e.g. `{\"projectId\":\"project-id\"}`",
-              schema: {
-                type: "string",
-              },
+              schema: { type: "string" },
             },
           ],
           responses: {
-            200: {
-              description: "List of Kanban tasks.",
+            200: { description: "List of Kanban tasks." },
+          },
+        },
+      },
+      "/trpc/tasks.create": {
+        post: {
+          tags: ["Tasks"],
+          summary: "Create Task",
+          description: "Manually add a task to the project's Kanban board.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    projectId: { type: "string" },
+                    prdId: { type: "string", nullable: true },
+                    title: { type: "string" },
+                    description: { type: "string", nullable: true },
+                  },
+                  required: ["projectId", "title"],
+                },
+              },
             },
+          },
+          responses: {
+            200: { description: "Task created successfully." },
           },
         },
       },
@@ -302,68 +562,109 @@ export async function GET() {
             },
           },
           responses: {
-            200: {
-              description: "Task status updated.",
-            },
+            200: { description: "Task status updated." },
           },
         },
       },
-      "/trpc/github.getInstallationStatus": {
-        get: {
-          tags: ["Projects"],
-          summary: "Get GitHub Connection Status",
-          description: "Verify if the workspace's GitHub App link is active.",
-          responses: {
-            200: {
-              description: "Connection status details.",
-            },
-          },
-        },
-      },
-      "/trpc/github.getRepos": {
-        get: {
-          tags: ["Projects"],
-          summary: "Get Installed Repositories",
-          description: "Fetch repositories allowed by the GitHub App installation.",
-          parameters: [
-            {
-              name: "input",
-              in: "query",
-              required: true,
-              description: "URL-encoded JSON input, e.g. `{\"page\":1}`",
-              schema: {
-                type: "string",
+      "/trpc/tasks.delete": {
+        post: {
+          tags: ["Tasks"],
+          summary: "Delete Task",
+          description: "Remove a task from the project's Kanban board.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    taskId: { type: "string" },
+                  },
+                  required: ["taskId"],
+                },
               },
             },
-          ],
+          },
           responses: {
-            200: {
-              description: "List of repositories.",
+            200: { description: "Task deleted successfully." },
+          },
+        },
+      },
+      "/trpc/tasks.approvePlan": {
+        post: {
+          tags: ["Tasks"],
+          summary: "Approve Plan & Start Development",
+          description: "Approve the auto-generated tasks and transition feature to development.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    featureId: { type: "string" },
+                  },
+                  required: ["featureId"],
+                },
+              },
             },
+          },
+          responses: {
+            200: { description: "Planning approved and feature set to development status." },
+          },
+        },
+      },
+      "/trpc/billing.getBillingState": {
+        get: {
+          tags: ["Billing"],
+          summary: "Get Billing Status",
+          description: "Fetch the authenticated user's Lemon Squeezy subscription state and PR review counts.",
+          responses: {
+            200: { description: "Subscription status details." },
+          },
+        },
+      },
+      "/trpc/billing.createCheckout": {
+        post: {
+          tags: ["Billing"],
+          summary: "Create Lemon Squeezy Checkout",
+          description: "Generate a billing portal checkout session URL.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    variantId: { type: "string" },
+                  },
+                  required: ["variantId"],
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: "Checkout session created." },
           },
         },
       },
       "/api/github/webhook": {
         post: {
           tags: ["Webhooks"],
-          summary: "GitHub App Webhooks",
-          description: "Receives events from the GitHub App installation.",
+          summary: "GitHub App Webhook",
+          description: "Endpoint to receive pushed commits and PR synchronization webhooks.",
           responses: {
-            200: {
-              description: "Webhook consumed successfully.",
-            },
+            200: { description: "Webhook received." },
           },
         },
       },
       "/api/billing/webhook": {
         post: {
           tags: ["Webhooks"],
-          summary: "Stripe Billing Webhook",
-          description: "Processes Stripe checkout and active subscription updates.",
+          summary: "Lemon Squeezy Billing Webhook",
+          description: "Listens for Lemon Squeezy checkout completions, variant switches, and cancel events.",
           responses: {
-            200: {
-              description: "Webhook consumed successfully.",
-            },
+            200: { description: "Webhook consumed successfully." },
           },
         },
       },

@@ -31,6 +31,7 @@ export default function LandingPage() {
   const [metricTab, setMetricTab] = useState<MetricTab>("ai-vs-human");
   const [activeAgent, setActiveAgent] = useState<"pm" | "architect" | "developer" | "qa">("pm");
   const [typedText, setTypedText] = useState("");
+  const [isNavigating, setIsNavigating] = useState(false);
 
   React.useEffect(() => {
     const agents: ("pm" | "architect" | "developer" | "qa")[] = ["pm", "architect", "developer", "qa"];
@@ -79,6 +80,7 @@ export default function LandingPage() {
   const [demoBooked, setDemoBooked] = useState(false);
 
   const handleStart = () => {
+    setIsNavigating(true);
     if (session) {
       router.push("/dashboard");
     } else {
@@ -251,27 +253,66 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-4">
             {isPending ? (
-              <div className="h-8 w-16 bg-white/5 rounded animate-pulse" />
+              <div className="flex items-center gap-4 animate-pulse opacity-60">
+                <button
+                  disabled
+                  className="text-xs font-semibold text-white/40 cursor-not-allowed mr-2"
+                >
+                  Sign In
+                </button>
+                <button
+                  disabled
+                  className="flex h-10 items-center justify-center rounded-lg bg-[#D7FFA4]/20 px-4 text-xs font-bold text-[#D7FFA4]/40 cursor-not-allowed"
+                >
+                  Get Started
+                </button>
+              </div>
             ) : session ? (
               <button
                 onClick={handleStart}
-                className="flex items-center gap-1.5 rounded-lg bg-[#D7FFA4] px-4 py-2.5 text-xs font-bold text-[#0F2124] transition-all hover:bg-[#cbf58e] hover:shadow-[0_0_15px_rgba(215,255,164,0.4)] cursor-pointer animate-pulse"
+                disabled={isNavigating}
+                className="flex items-center gap-1.5 rounded-lg bg-[#D7FFA4] px-4 py-2.5 text-xs font-bold text-[#0F2124] transition-all hover:bg-[#cbf58e] hover:shadow-[0_0_15px_rgba(215,255,164,0.4)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Go to Dashboard <ArrowRight weight="bold" className="size-3.5" />
+                {isNavigating ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg className="animate-spin h-3.5 w-3.5 text-[#0F2124]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  <>Go to Dashboard <ArrowRight weight="bold" className="size-3.5" /></>
+                )}
               </button>
             ) : (
               <>
                 <button
-                  onClick={() => router.push("/sign-in")}
-                  className="text-xs font-semibold text-white/80 hover:text-white transition-colors mr-2"
+                  onClick={() => {
+                    setIsNavigating(true);
+                    router.push("/sign-in");
+                  }}
+                  disabled={isNavigating}
+                  className="text-xs font-semibold text-white/80 hover:text-white transition-colors mr-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={handleStart}
-                  className="flex h-10 items-center justify-center rounded-lg bg-[#D7FFA4] px-4 text-xs font-bold text-[#0F2124] transition hover:bg-[#cbf58e] cursor-pointer shadow-[0_0_15px_rgba(215,255,164,0.3)]"
+                  disabled={isNavigating}
+                  className="flex h-10 items-center justify-center rounded-lg bg-[#D7FFA4] px-4 text-xs font-bold text-[#0F2124] transition hover:bg-[#cbf58e] cursor-pointer shadow-[0_0_15px_rgba(215,255,164,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Get Started
+                  {isNavigating ? (
+                    <span className="flex items-center gap-1.5">
+                      <svg className="animate-spin h-3.5 w-3.5 text-[#0F2124]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Loading...
+                    </span>
+                  ) : (
+                    "Get Started"
+                  )}
                 </button>
               </>
             )}
@@ -299,9 +340,20 @@ export default function LandingPage() {
             <div className="flex flex-wrap gap-3 pt-2">
               <button
                 onClick={handleStart}
-                className="flex h-11 items-center justify-center gap-2 rounded-lg bg-[#D7FFA4] px-6 text-xs font-bold text-[#0F2124] transition hover:bg-[#cbf58e] cursor-pointer shadow-[0_0_15px_rgba(215,255,164,0.2)]"
+                disabled={isNavigating}
+                className="flex h-11 items-center justify-center gap-2 rounded-lg bg-[#D7FFA4] px-6 text-xs font-bold text-[#0F2124] transition hover:bg-[#cbf58e] cursor-pointer shadow-[0_0_15px_rgba(215,255,164,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Get Started for Free
+                {isNavigating ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg className="animate-spin h-3.5 w-3.5 text-[#0F2124]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  "Get Started for Free"
+                )}
               </button>
               <a
                 href="#demo"
@@ -1048,8 +1100,22 @@ export default function LandingPage() {
                   </li>
                 </ul>
               </div>
-              <button onClick={handleStart} className="mt-8 w-full py-2.5 rounded-lg border border-white/10 hover:bg-white/5 transition-all text-xs font-bold cursor-pointer">
-                Get Started Free
+              <button
+                onClick={handleStart}
+                disabled={isNavigating}
+                className="mt-8 w-full py-2.5 rounded-lg border border-white/10 hover:bg-white/5 transition-all text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isNavigating ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  "Get Started Free"
+                )}
               </button>
             </div>
 
@@ -1078,8 +1144,22 @@ export default function LandingPage() {
                   </li>
                 </ul>
               </div>
-              <button onClick={handleStart} className="mt-8 w-full py-2.5 rounded-lg bg-[#D7FFA4] text-[#0F2124] hover:bg-[#cbf58e] transition-all text-xs font-bold cursor-pointer">
-                Upgrade in Settings
+              <button
+                onClick={handleStart}
+                disabled={isNavigating}
+                className="mt-8 w-full py-2.5 rounded-lg bg-[#D7FFA4] text-[#0F2124] hover:bg-[#cbf58e] transition-all text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isNavigating ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg className="animate-spin h-3.5 w-3.5 text-[#0F2124]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  "Upgrade in Settings"
+                )}
               </button>
             </div>
 
@@ -1110,8 +1190,22 @@ export default function LandingPage() {
                   </li>
                 </ul>
               </div>
-              <button onClick={handleStart} className="mt-8 w-full py-2.5 rounded-lg border border-amber-500/20 text-amber-500 hover:bg-amber-500/5 transition-all text-xs font-bold cursor-pointer">
-                Upgrade in Settings
+              <button
+                onClick={handleStart}
+                disabled={isNavigating}
+                className="mt-8 w-full py-2.5 rounded-lg border border-amber-500/20 text-amber-500 hover:bg-amber-500/5 transition-all text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isNavigating ? (
+                  <span className="flex items-baseline justify-center gap-1.5">
+                    <svg className="animate-spin h-3.5 w-3.5 text-amber-500 self-center" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  "Upgrade in Settings"
+                )}
               </button>
             </div>
           </div>
@@ -1128,9 +1222,20 @@ export default function LandingPage() {
           <div className="pt-2">
             <button
               onClick={handleStart}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#D7FFA4] px-8 py-3 text-sm font-bold text-[#0F2124] transition-all hover:bg-[#cbf58e] hover:shadow-[0_0_20px_rgba(215,255,164,0.4)] cursor-pointer"
+              disabled={isNavigating}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#D7FFA4] px-8 py-3 text-sm font-bold text-[#0F2124] transition-all hover:bg-[#cbf58e] hover:shadow-[0_0_20px_rgba(215,255,164,0.4)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Get Started Free <ArrowRight weight="bold" className="size-3.5" />
+              {isNavigating ? (
+                <span className="flex items-center gap-1.5">
+                  <svg className="animate-spin h-3.5 w-3.5 text-[#0F2124]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Loading...
+                </span>
+              ) : (
+                <>Get Started Free <ArrowRight weight="bold" className="size-3.5" /></>
+              )}
             </button>
           </div>
           <p className="text-[10px] text-white/30 pt-8">

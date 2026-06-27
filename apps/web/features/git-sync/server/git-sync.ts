@@ -155,10 +155,12 @@ export async function syncFeatureToGit(featureId: string) {
     path: ".theship/00_START_HERE.md",
     content: `This project uses TheShip.
 
-Step 1: Read 01_PRD.md  
-Step 2: Read 02_TASKS.json  
-Step 3: Follow tasks in order  
-Step 4: Never assume requirements outside TheShip folder
+Step 1: Sync the latest specifications and tasks by running:
+       git fetch origin && git checkout origin/${branch} -- .theship
+Step 2: Read 01_PRD.md  
+Step 3: Read 02_TASKS.json  
+Step 4: Follow tasks in order  
+Step 5: Never assume requirements outside TheShip folder
 `
   });
 
@@ -170,12 +172,12 @@ This project uses TheShip for task management and specifications.
 
 ## ⚠️ CRITICAL INSTRUCTION
 Before executing any task or writing any code, you MUST:
-1. Run \`git pull\` to fetch the latest specifications and tasks from the \`.theship\` directory.
+1. Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to fetch the latest specifications and tasks without merging/pulling local code. (Alternatively, run \`git pull origin ${branch}\` to sync everything).
 2. Read the global guidelines in \`.theship/00_START_HERE.md\`.
-3. Read the active feature requirements in \`.theship/features/{feature}/01_PRD.md\` (and \`prd.md\`).
-4. Refer to the task specifications in \`.theship/features/{feature}/02_TASKS.json\` and the detailed task files under \`.theship/features/{feature}/tasks/\`.
+3. Read the active feature requirements in \`.theship/features/${slug}/01_PRD.md\` (and \`prd.md\`).
+4. Refer to the task specifications in \`.theship/features/${slug}/02_TASKS.json\` and the detailed task files under \`.theship/features/${slug}/tasks/\`.
 5. Never assume requirements outside the \`.theship\` directory.
-6. After completing a task, check it off in \`.theship/features/{feature}/tasks.md\` by changing the checkbox (e.g. \`[ ]\` to \`[x]\` or \`[/]\`), commit, and push.
+6. After completing a task, check it off in \`.theship/features/${slug}/tasks.md\` by changing the checkbox (e.g. \`[ ]\` to \`[x]\` or \`[/]\`), commit, and push.
 `
   });
 
@@ -187,11 +189,11 @@ This project uses TheShip for tracking specifications and engineering tasks.
 
 ## ⚠️ CRITICAL INSTRUCTION
 Before starting work:
-1. Run \`git pull\` to fetch the latest \`.theship\` updates.
+1. Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to sync specifications without fetching other code changes. (Alternatively, run \`git pull origin ${branch}\` to sync everything).
 2. Read \`.theship/00_START_HERE.md\` and \`.theship/AI_PRIORITY.flag\`.
-3. Review the active feature requirements in \`.theship/features/{feature}/01_PRD.md\` and the tasks in \`.theship/features/{feature}/02_TASKS.json\`.
+3. Review the active feature requirements in \`.theship/features/${slug}/01_PRD.md\` and the tasks in \`.theship/features/${slug}/02_TASKS.json\`.
 4. Follow tasks in order. Do not guess or assume requirements outside the \`.theship\` folder.
-5. Mark completed tasks in \`.theship/features/{feature}/tasks.md\` and push your changes to trigger sync.
+5. Mark completed tasks in \`.theship/features/${slug}/tasks.md\` and push your changes to trigger sync.
 `
   });
 
@@ -202,7 +204,7 @@ Before starting work:
 
   files.push({
     path: ".theship/llms.txt",
-    content: `# TheShip AI Workspace Guide\nThis directory contains the product specifications, architecture plans, and task lists compiled by TheShip AI.\n\n## Usage for IDE Agents (Cursor / Claude Code)\n1. Read the active feature specifications in \`.theship/features/{feature_name}/01_PRD.md\`.\n2. Check the active engineering tasks in \`.theship/features/{feature_name}/tasks.md\`.\n3. Refer to \`.theship/features/{feature_name}/tasks/{index}-{task_slug}.md\` for detailed coding instructions on each task.\n4. Update the tasks by marking checkboxes in the main \`tasks.md\` file (e.g. \`[ ]\` for Todo, \`[/]\` for In Progress, \`[-]\` for In Review, \`[x]\` for Done) as you write the code.\n5. Commit and push the changes to sync back to the TheShip board.\n`
+    content: `# TheShip AI Workspace Guide\nThis directory contains the product specifications, architecture plans, and task lists compiled by TheShip AI.\n\n## Usage for IDE Agents (Cursor / Claude Code)\nBefore doing anything, you MUST:\n1. Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to load the latest specification files.\n2. Read the active feature specifications in \`.theship/features/${slug}/01_PRD.md\`.\n3. Check the active engineering tasks in \`.theship/features/${slug}/tasks.md\`.\n4. Refer to \`.theship/features/${slug}/tasks/{index}-{task_slug}.md\` for detailed coding instructions on each task.\n5. Update the tasks by marking checkboxes in the main \`tasks.md\` file (e.g. \`[ ]\` for Todo, \`[/]\` for In Progress, \`[-]\` for In Review, \`[x]\` for Done) as you write the code.\n6. Commit and push the changes to sync back to the TheShip board.\n`
   });
 
   // 2. Feature PRD and Guide

@@ -238,27 +238,51 @@ export const reviewPullRequest = inngest.createFunction(
         });
       });
 
-      const { cleanReview } = await step.run("parse-and-apply-task-updates", async () => {
+      const { cleanReview, featureIdsToSync } = await step.run("parse-and-apply-task-updates", async () => {
         const match = review.match(/\[TASK_UPDATES\]([\s\S]*?)\[\/TASK_UPDATES\]/);
         const clean = review.replace(/\[TASK_UPDATES\][\s\S]*?\[\/TASK_UPDATES\]/, "").trim();
+        const syncIds = new Set<string>();
+
+        if (pullRequest.featureRequestId) {
+          syncIds.add(pullRequest.featureRequestId);
+        }
         
         if (match) {
           try {
             const updates = JSON.parse(match[1].trim());
             for (const [taskId, status] of Object.entries(updates)) {
               if (status === "in_progress" || status === "review" || status === "todo") {
-                await prisma.task.update({
+                const updatedTask = await prisma.task.update({
                   where: { id: taskId },
                   data: { status },
+                  include: {
+                    prd: {
+                      select: { featureRequestId: true }
+                    }
+                  }
                 });
+                if (updatedTask.prd?.featureRequestId) {
+                  syncIds.add(updatedTask.prd.featureRequestId);
+                }
               }
             }
           } catch (err) {
             console.error("Failed to parse task updates", err);
           }
         }
-        return { cleanReview: clean };
+        return { cleanReview: clean, featureIdsToSync: Array.from(syncIds) };
       });
+
+      if (featureIdsToSync && featureIdsToSync.length > 0) {
+        await step.run("trigger-git-sync", async () => {
+          for (const featureId of featureIdsToSync) {
+            await inngest.send({
+              name: "app/git_sync.requested",
+              data: { featureId }
+            });
+          }
+        });
+      }
   
       await step.run("post-pr-comment", async () => {
         await postPrComment(

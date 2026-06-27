@@ -115,6 +115,7 @@ Provide a brief summary statement of the review findings.
 ## ⚙️ Kanban Task Transitions
 
 Under this section, you MUST first write a clear, human-readable bulleted list summarizing the status transitions for the planned engineering tasks (e.g., "* **Create Contact Form UI** (ID: \`cmqqllxoo0000k03s5ltusb8r\`) was transitioned to **In Review**"). If no tasks are transitioned, explicitly state that no task transitions occurred.
+For any remaining tasks that did not transition and remain in "todo" status, you MUST list them using their human-readable title along with their ID (e.g., "Remaining tasks: **Integrate API** (ID: \`cmqqllxoo0001k03s5ltusb8r\`), **Write Tests** (ID: \`cmqqllxoo0002k03s5ltusb8r\`) remain **Todo**"). Never list bare task IDs without their human-readable titles.
 
 Below the human-readable summary, you MUST include a structured JSON block updating the status of the planned engineering tasks based on the code changes:
 - Evaluate each task ID provided in the PLANNED ENGINEERING TASKS section against the code changes.

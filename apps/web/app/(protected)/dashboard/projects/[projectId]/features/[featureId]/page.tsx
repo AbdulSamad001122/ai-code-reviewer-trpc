@@ -32,6 +32,9 @@ import {
   ArrowSquareOut,
   Sparkle,
   Trash,
+  Copy,
+  Info,
+  Terminal,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -930,6 +933,63 @@ export default function FeatureDetailPage({
                   <div className="text-sm font-mono text-foreground bg-accent px-1.5 py-0.5 rounded w-fit">
                     {feature.project.branch}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-sm">
+              <CardHeader className="py-4 border-b border-border/50">
+                <CardTitle className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                  <Terminal className="size-4 text-primary" />
+                  Sync Locally for AI IDE
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-foreground">Option 1: Sync Everything</div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Pull all code changes and specification files from the remote branch:
+                  </p>
+                  <div className="relative group bg-muted p-2.5 rounded border border-border/50 font-mono text-xs text-foreground select-all break-all pr-8">
+                    git pull origin {feature.project.branch}
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(`git pull origin ${feature.project.branch}`);
+                        toast.success("Command copied to clipboard!");
+                      }}
+                      className="absolute right-2 top-2 rounded opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground"
+                      title="Copy command"
+                    >
+                      <Copy className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-3 border-t border-border/50">
+                  <div className="text-xs font-semibold text-foreground">Option 2: Sync Specifications Only</div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Download only the <code className="bg-muted px-1 rounded font-mono">.theship/</code> folder changes, keeping your local code changes untouched:
+                  </p>
+                  <div className="relative group bg-muted p-2.5 rounded border border-border/50 font-mono text-xs text-foreground select-all break-all pr-8">
+                    git fetch origin && git checkout origin/{feature.project.branch} -- .theship
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(`git fetch origin && git checkout origin/${feature.project.branch} -- .theship`);
+                        toast.success("Command copied to clipboard!");
+                      }}
+                      className="absolute right-2 top-2 rounded opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground"
+                      title="Copy command"
+                    >
+                      <Copy className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-muted-foreground flex gap-1.5 items-start bg-accent/30 p-2 rounded">
+                  <Info className="size-3.5 text-primary shrink-0 mt-0.5" />
+                  <span>
+                    Your local AI IDE will automatically discover and follow guidelines inside the <code className="bg-muted px-1 rounded font-mono">.theship/</code> folder.
+                  </span>
                 </div>
               </CardContent>
             </Card>

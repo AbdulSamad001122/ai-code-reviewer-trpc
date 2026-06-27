@@ -153,58 +153,81 @@ export async function syncFeatureToGit(featureId: string) {
 
   files.push({
     path: ".theship/00_START_HERE.md",
-    content: `This project uses TheShip.
+    content: `# 🚢 TheShip AI Developer Protocol
 
-Step 1: Sync the latest specifications and tasks by running:
-       git fetch origin && git checkout origin/${branch} -- .theship
-Step 2: Read 01_PRD.md  
-Step 3: Read 02_TASKS.json  
-Step 4: Follow tasks in order  
-Step 5: Never assume requirements outside TheShip folder
+This repository is managed by **TheShip**. Follow this protocol to align your development with the active product specifications.
+
+## ⚠️ READ-ONLY CONSTRAINTS
+- **DO NOT** write, modify, delete, or overwrite any files in the \`.theship/\` directory (except checkboxes inside \`tasks.md\`).
+- This folder acts as your **read-only source of truth** representing the PM directives and PRD.
+
+## 📋 SYSTEMATIC WORKFLOW
+1. **Fetch Latest Spec**: Sync the configuration files without changing your branch code:
+   \`\`\`bash
+   git fetch origin && git checkout origin/${branch} -- .theship
+   \`\`\`
+2. **Understand the PRD**: Read \`.theship/features/${slug}/01_PRD.md\`.
+3. **Execute Linearly**: Read \`.theship/features/${slug}/02_TASKS.json\` and follow the individual task instructions under \`.theship/features/${slug}/tasks/\` in strict sequential order.
+4. **Inspect Reviews**: Check \`.theship/features/${slug}/review.md\` to fix any blocking comments raised in previous PR reviews.
+5. **Update Kanban**: Mark task progress in \`.theship/features/${slug}/tasks.md\` using:
+   - \`[ ]\` - Todo
+   - \`[/]\` - In Progress
+   - \`[-]\` - In Review
+   - \`[x]\` - Done
+   Commit and push your changes to synchronize status.
 `
   });
 
   files.push({
     path: ".cursorrules",
-    content: `# TheShip Cursor Rules
+    content: `# TheShip System Rules for AI IDE (Cursor)
 
-This project uses TheShip for task management and specifications.
+You are an AI coding assistant acting as a developer inside this workspace.
 
-## ⚠️ CRITICAL INSTRUCTION
-Before executing any task or writing any code, you MUST:
-1. Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to fetch the latest specifications and tasks without merging/pulling local code. (Alternatively, run \`git pull origin ${branch}\` to sync everything).
-2. Read the global guidelines in \`.theship/00_START_HERE.md\`.
-3. Read the active feature requirements in \`.theship/features/${slug}/01_PRD.md\` (and \`prd.md\`).
-4. Refer to the task specifications in \`.theship/features/${slug}/02_TASKS.json\` and the detailed task files under \`.theship/features/${slug}/tasks/\`.
-5. Never assume requirements outside the \`.theship\` directory.
-6. After completing a task, check it off in \`.theship/features/${slug}/tasks.md\` by changing the checkbox (e.g. \`[ ]\` to \`[x]\` or \`[/]\`), commit, and push.
+## ⚠️ CRITICAL RULES
+1. **Read-Only Directory**: The \`.theship/\` directory is **read-only**. You MUST NOT delete, modify, or overwrite any PRD, guide, task data, or review files (except checking off task boxes inside \`tasks.md\`).
+2. **Single Source of Truth**: Treat \`.theship/features/${slug}/01_PRD.md\` as the absolute source of truth. Do not invent requirements outside of it.
+3. **Strict Task Sequence**: Implement tasks in the exact order listed in \`02_TASKS.json\`. Read the corresponding detail file \`tasks/{index}-{task_slug}.md\` for each task.
+
+## 🛠️ WORKFLOW FOR ACTIVE WORK
+- **Fetch Specs**: Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to fetch updates.
+- **Review Feedback**: Always check if \`review.md\` exists. If there is a review file with \`REQUEST CHANGES\` or \`[BLOCKING]\` issues, prioritize fixing them before starting new tasks.
+- **Progress Tracking**: Update status in \`tasks.md\` by changing checkboxes:
+  - \`[ ]\` -> \`[/]\` when starting a task.
+  - \`[/]\` -> \`[x]\` when the task is verified and complete.
+  Commit and push to sync.
 `
   });
 
   files.push({
     path: "CLAUDE.md",
-    content: `# CLAUDE.md - TheShip Guidelines
+    content: `# CLAUDE.md - TheShip System Rules for Claude Code
 
 This project uses TheShip for tracking specifications and engineering tasks.
 
-## ⚠️ CRITICAL INSTRUCTION
-Before starting work:
-1. Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to sync specifications without fetching other code changes. (Alternatively, run \`git pull origin ${branch}\` to sync everything).
-2. Read \`.theship/00_START_HERE.md\` and \`.theship/AI_PRIORITY.flag\`.
-3. Review the active feature requirements in \`.theship/features/${slug}/01_PRD.md\` and the tasks in \`.theship/features/${slug}/02_TASKS.json\`.
-4. Follow tasks in order. Do not guess or assume requirements outside the \`.theship\` folder.
-5. Mark completed tasks in \`.theship/features/${slug}/tasks.md\` and push your changes to trigger sync.
+## ⚠️ CRITICAL RULES
+1. **Read-Only Directory**: The \`.theship/\` directory is **read-only**. You MUST NOT delete, modify, or overwrite any PRD, guide, task data, or review files (except checking off task boxes inside \`tasks.md\`).
+2. **Single Source of Truth**: Treat \`.theship/features/${slug}/01_PRD.md\` as the absolute source of truth. Do not invent requirements outside of it.
+3. **Strict Task Sequence**: Implement tasks in the exact order listed in \`02_TASKS.json\`. Read the corresponding detail file \`tasks/{index}-{task_slug}.md\` for each task.
+
+## 🛠️ WORKFLOW FOR ACTIVE WORK
+- **Fetch Specs**: Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to fetch updates.
+- **Review Feedback**: Always check if \`review.md\` exists. If there is a review file with \`REQUEST CHANGES\` or \`[BLOCKING]\` issues, prioritize fixing them before starting new tasks.
+- **Progress Tracking**: Update status in \`tasks.md\` by changing checkboxes:
+  - \`[ ]\` -> \`[/]\` when starting a task.
+  - \`[/]\` -> \`[x]\` when the task is verified and complete.
+  Commit and push to sync.
 `
   });
 
   files.push({
     path: ".theship/README.md",
-    content: `# TheShip AI Workspace\n\nThis directory contains specifications and tasks synced from your TheShip board.\n\n## Folder Structure\n* \`llms.txt\` - Configuration guide for local AI code assistants (Cursor, Claude Code).\n* \`features/\` - Subfolders containing active features.\n  * \`{feature-title}/01_PRD.md\` - Product requirements and acceptance criteria.\n  * \`{feature-title}/02_TASKS.json\` - JSON data representing active tasks.\n  * \`{feature-title}/guide.md\` - Implementation details and guides.\n  * \`{feature-title}/tasks.md\` - Main engineering task list and checkbox sync.\n  * \`{feature-title}/tasks/\` - Detailed step-by-step documentation for each individual task.\n`
+    content: `# TheShip AI Workspace\n\nThis directory contains specifications, task boards, and reviews synced from your TheShip board.\n\n## ⚠️ Read-Only Directory\nDO NOT delete, modify, or overwrite any files in this directory (except checking checkboxes inside \`tasks.md\`).\n\n## Folder Structure\n* \`llms.txt\` - Configuration guide for local AI code assistants (Cursor, Claude Code).\n* \`features/\` - Subfolders containing active features.\n  * \`{feature-title}/01_PRD.md\` - Product requirements and acceptance criteria.\n  * \`{feature-title}/02_TASKS.json\` - JSON data representing active tasks.\n  * \`{feature-title}/review.md\` - Latest code review feedback logs.\n  * \`{feature-title}/guide.md\` - Implementation details and guides.\n  * \`{feature-title}/tasks.md\` - Main engineering task list and checkbox sync.\n  * \`{feature-title}/tasks/\` - Detailed step-by-step documentation for each individual task.\n`
   });
 
   files.push({
     path: ".theship/llms.txt",
-    content: `# TheShip AI Workspace Guide\nThis directory contains the product specifications, architecture plans, and task lists compiled by TheShip AI.\n\n## Usage for IDE Agents (Cursor / Claude Code)\nBefore doing anything, you MUST:\n1. Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to load the latest specification files.\n2. Read the active feature specifications in \`.theship/features/${slug}/01_PRD.md\`.\n3. Check the active engineering tasks in \`.theship/features/${slug}/tasks.md\`.\n4. Refer to \`.theship/features/${slug}/tasks/{index}-{task_slug}.md\` for detailed coding instructions on each task.\n5. Update the tasks by marking checkboxes in the main \`tasks.md\` file (e.g. \`[ ]\` for Todo, \`[/]\` for In Progress, \`[-]\` for In Review, \`[x]\` for Done) as you write the code.\n6. Commit and push the changes to sync back to the TheShip board.\n`
+    content: `# TheShip System Rules for LLM/IDE Assistants\n\n## ⚠️ CRITICAL RULES\n1. **Read-Only Directory**: The \`.theship/\` directory is **read-only**. You MUST NOT delete, modify, or overwrite any PRD, guide, task data, or review files (except checking off task boxes inside \`tasks.md\`).\n2. **Single Source of Truth**: Treat \`.theship/features/${slug}/01_PRD.md\` as the absolute source of truth. Do not invent requirements outside of it.\n3. **Strict Task Sequence**: Implement tasks in the exact order listed in \`02_TASKS.json\`. Read the corresponding detail file \`tasks/{index}-{task_slug}.md\` for each task.\n\n## 🛠️ WORKFLOW FOR ACTIVE WORK\n- **Fetch Specs**: Run \`git fetch origin && git checkout origin/${branch} -- .theship\` to fetch updates.\n- **Review Feedback**: Always check if \`review.md\` exists. If there is a review file with \`REQUEST CHANGES\` or \`[BLOCKING]\` issues, prioritize fixing them before starting new tasks.\n- **Progress Tracking**: Update status in \`tasks.md\` by changing checkboxes:\n  - \`[ ]\` -> \`[/]\` when starting a task.\n  - \`[/]\` -> \`[x]\` when the task is verified and complete.\n  Commit and push to sync.\n`
   });
 
   // 2. Feature PRD and Guide

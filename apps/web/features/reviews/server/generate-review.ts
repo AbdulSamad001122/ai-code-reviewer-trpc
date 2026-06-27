@@ -120,10 +120,7 @@ Under this section, you MUST first write a clear, human-readable bulleted list s
 For any remaining tasks that did not transition and remain in "todo" status, you MUST list them using their human-readable title along with their ID (e.g., "Remaining tasks: **Integrate API** (ID: \`cmqqllxoo0001k03s5ltusb8r\`), **Write Tests** (ID: \`cmqqllxoo0002k03s5ltusb8r\`) remain **Todo**"). Never list bare task IDs without their human-readable titles.
 
 Below the human-readable summary, you MUST include a structured JSON block updating the status of the planned engineering tasks based on the code changes:
-- Evaluate each task ID provided in the PLANNED ENGINEERING TASKS section against the code changes.
-- Transition status to "review" if the task's implementation is fully complete in the diff.
-- Transition status to "in_progress" if code changes implementing the task have started but are not yet complete.
-- Keep status as "todo" if no code has been written for the task yet.
+- CRITICAL TASK ID RULE: You MUST use the task IDs from the PLANNED ENGINEERING TASKS section in this prompt for your [TASK_UPDATES] block and transitions summary. Do NOT use the task IDs from the repository's \`.theship\` files if they differ. The IDs in the PLANNED ENGINEERING TASKS section are the source of truth for the database you are updating.
 - CRITICAL GUARDRAIL: Never set a task status to "done" or "completed". Only "in_progress", "review", or "todo" are allowed.
 - Output this block enclosed in [TASK_UPDATES] and [/TASK_UPDATES] tags.
 - Example:

@@ -226,11 +226,19 @@ export const reviewPullRequest = inngest.createFunction(
         return null;
       });
 
-      const review = await step.run("generate-ai-review", async () => {
-        const contextSnippets = await searchPrContext(
-          namespace,
-          pullRequest.title
+      const files = await step.run("fetch-pr-files", async () => {
+        return getPullRequestFiles(
+          pullRequest.installationId,
+          pullRequest.repoFullName,
+          pullRequest.prNumber
         );
+      });
+
+      const review = await step.run("generate-ai-review", async () => {
+        const contextSnippets = files.map((f) => {
+          const patchContent = f.patch.length > 20000 ? f.patch.slice(0, 20000) + "\n... [TRUNCATED] ..." : f.patch;
+          return `### File: ${f.filePath}\n\`\`\`diff\n${patchContent}\n\`\`\``;
+        });
   
         return generateReview({
           repoFullName: pullRequest.repoFullName,
@@ -255,19 +263,55 @@ export const reviewPullRequest = inngest.createFunction(
         if (match) {
           try {
             const updates = JSON.parse(match[1].trim());
+
+            // Pre-fetch active feature tasks to map them correctly in case of local/production task ID mismatches
+            let dbTasks: any[] = [];
+            if (pullRequest.featureRequestId) {
+              const feat = await prisma.featureRequest.findUnique({
+                where: { id: pullRequest.featureRequestId },
+                include: { prd: { include: { tasks: true } } }
+              });
+              if (feat?.prd?.tasks) {
+                // Sort chronologically to match the ordered sequence of planned tasks
+                dbTasks = feat.prd.tasks.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+              }
+            }
+
             for (const [taskId, status] of Object.entries(updates)) {
               if (status === "in_progress" || status === "review" || status === "todo") {
-                const updatedTask = await prisma.task.update({
-                  where: { id: taskId },
-                  data: { status },
-                  include: {
-                    prd: {
-                      select: { featureRequestId: true }
-                    }
+                let targetTaskId = taskId;
+
+                // 1. Try to locate the task by its ID
+                let dbTask = dbTasks.find(t => t.id === targetTaskId);
+                if (!dbTask) {
+                  dbTask = await prisma.task.findUnique({
+                    where: { id: targetTaskId }
+                  });
+                }
+
+                // 2. Fallback: Map task update by chronological index if the ID from .theship (local DB) doesn't exist in the current DB (production)
+                if (!dbTask && dbTasks.length > 0) {
+                  const updatesKeys = Object.keys(updates);
+                  const updateIdx = updatesKeys.indexOf(taskId);
+                  if (updateIdx !== -1 && dbTasks[updateIdx]) {
+                    dbTask = dbTasks[updateIdx];
+                    targetTaskId = dbTask.id;
                   }
-                });
-                if (updatedTask.prd?.featureRequestId) {
-                  syncIds.add(updatedTask.prd.featureRequestId);
+                }
+
+                if (dbTask) {
+                  const updatedTask = await prisma.task.update({
+                    where: { id: targetTaskId },
+                    data: { status },
+                    include: {
+                      prd: {
+                        select: { featureRequestId: true }
+                      }
+                    }
+                  });
+                  if (updatedTask.prd?.featureRequestId) {
+                    syncIds.add(updatedTask.prd.featureRequestId);
+                  }
                 }
               }
             }

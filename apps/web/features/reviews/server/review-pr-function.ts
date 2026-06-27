@@ -6,6 +6,175 @@ import { postPrComment } from "./post-pr-comment";
 import { chunkPrFiles } from "../utils/chunk-code";
 import { buildPrNamespace, saveChunksToPinecone, searchPrContext } from "./vector";
 import { buildRepoNamespace } from "@/features/repo-sync/server/repo-sync";
+import { getGithubApp } from "@/features/github/utils/github-app";
+import { getSlug } from "@/features/git-sync/server/git-sync";
+
+async function fetchTheShipContextFromRepo(
+  installationId: number,
+  repoFullName: string,
+  ref: string
+): Promise<{ slug: string; prdContent: string; tasks: any[] } | null> {
+  const app = getGithubApp();
+  const octokit = await app.getInstallationOctokit(installationId);
+  const [owner, repo] = repoFullName.split("/");
+
+  try {
+    const { data: featuresDir } = await octokit.request(
+      "GET /repos/{owner}/{repo}/contents/.theship/features",
+      { owner, repo, ref }
+    );
+
+    if (!Array.isArray(featuresDir)) {
+      return null;
+    }
+
+    const featureFolder = featuresDir.find(item => item.type === "dir");
+    if (!featureFolder) {
+      return null;
+    }
+
+    const slug = featureFolder.name;
+
+    let prdContent = "";
+    try {
+      const { data: prdFile } = await octokit.request(
+        "GET /repos/{owner}/{repo}/contents/{path}",
+        { owner, repo, path: `.theship/features/${slug}/01_PRD.md`, ref }
+      );
+      if (prdFile && typeof prdFile === "object" && "content" in prdFile) {
+        prdContent = Buffer.from(prdFile.content as string, "base64").toString("utf-8");
+      }
+    } catch {
+      try {
+        const { data: prdFile } = await octokit.request(
+          "GET /repos/{owner}/{repo}/contents/{path}",
+          { owner, repo, path: `.theship/features/${slug}/prd.md`, ref }
+        );
+        if (prdFile && typeof prdFile === "object" && "content" in prdFile) {
+          prdContent = Buffer.from(prdFile.content as string, "base64").toString("utf-8");
+        }
+      } catch (err) {
+        console.error("Could not load PRD file:", err);
+      }
+    }
+
+    let tasks: any[] = [];
+    try {
+      const { data: tasksFile } = await octokit.request(
+        "GET /repos/{owner}/{repo}/contents/{path}",
+        { owner, repo, path: `.theship/features/${slug}/02_TASKS.json`, ref }
+      );
+      if (tasksFile && typeof tasksFile === "object" && "content" in tasksFile) {
+        const rawJson = Buffer.from(tasksFile.content as string, "base64").toString("utf-8");
+        tasks = JSON.parse(rawJson);
+      }
+    } catch (e) {
+      console.error("Failed to fetch 02_TASKS.json from repo:", e);
+    }
+
+    return { slug, prdContent, tasks };
+  } catch (e) {
+    console.error("Failed to fetch .theship context from repo:", e);
+    return null;
+  }
+}
+
+async function syncDatabaseToTheShipContext(
+  projectId: string,
+  repoContext: { slug: string; prdContent: string; tasks: any[] }
+) {
+  const features = await prisma.featureRequest.findMany({
+    where: { projectId },
+    include: { prd: { include: { tasks: true } } }
+  });
+
+  let feature: any = features.find(f => getSlug(f.title) === repoContext.slug);
+
+  if (!feature) {
+    feature = await prisma.featureRequest.findFirst({
+      where: {
+        projectId,
+        status: { in: ["development", "planning", "prd_generation", "ready_for_review"] }
+      },
+      include: { prd: { include: { tasks: true } } }
+    });
+
+    if (feature) {
+      const newTitle = repoContext.slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      feature = await prisma.featureRequest.update({
+        where: { id: feature.id },
+        data: { title: newTitle },
+        include: { prd: { include: { tasks: true } } }
+      });
+    }
+  }
+
+  if (!feature) {
+    const newTitle = repoContext.slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    feature = await prisma.featureRequest.create({
+      data: {
+        projectId,
+        title: newTitle,
+        description: `Synced from .theship folder for ${repoContext.slug}`,
+        status: "development",
+      },
+      include: { prd: { include: { tasks: true } } }
+    });
+  }
+
+  let prd = feature.prd;
+  if (!prd) {
+    prd = await prisma.pRD.create({
+      data: {
+        featureRequestId: feature.id,
+        problemStatement: repoContext.prdContent.slice(0, 1000),
+        goals: [],
+        successMetrics: [],
+        userStories: [],
+        acceptanceCriteria: [],
+        rawContent: repoContext.prdContent
+      },
+      include: { tasks: true }
+    });
+  } else {
+    prd = await prisma.pRD.update({
+      where: { id: prd.id },
+      data: {
+        rawContent: repoContext.prdContent
+      },
+      include: { tasks: true }
+    });
+  }
+
+  const repoTasks = repoContext.tasks;
+  const dbTasks = prd.tasks;
+
+  const dbTaskIds = new Set(dbTasks.map((t: any) => t.id));
+  const needsSync = repoTasks.length !== dbTasks.length || repoTasks.some((rt: any) => !dbTaskIds.has(rt.id));
+
+  if (needsSync) {
+    console.log(`Syncing database tasks to match .theship tasks for feature: ${repoContext.slug}`);
+    
+    await prisma.task.deleteMany({
+      where: { prdId: prd.id }
+    });
+
+    for (const rt of repoTasks) {
+      await prisma.task.create({
+        data: {
+          id: rt.id,
+          projectId: feature.projectId,
+          prdId: prd.id,
+          title: rt.title,
+          description: rt.description || "",
+          status: rt.status || "todo",
+        }
+      });
+    }
+  }
+
+  return { featureId: feature.id, prd, tasks: repoTasks };
+}
 
 
 export const reviewPullRequest = inngest.createFunction(
@@ -149,6 +318,44 @@ export const reviewPullRequest = inngest.createFunction(
       });
   
       const prdContext = await step.run("fetch-prd-context", async () => {
+        // 1. Fetch .theship context directly from the repository branch
+        const repoContext = await fetchTheShipContextFromRepo(
+          pullRequest.installationId,
+          pullRequest.repoFullName,
+          pullRequest.headSha
+        );
+
+        const project = await prisma.project.findFirst({
+          where: { repoFullName: { equals: pullRequest.repoFullName, mode: "insensitive" } },
+        });
+
+        if (repoContext && project) {
+          // Sync database feature, PRD, and tasks with .theship configurations
+          const synced = await syncDatabaseToTheShipContext(project.id, repoContext);
+          
+          // Persist the link to the database
+          await prisma.pullRequest.update({
+            where: { id: pullRequestId },
+            data: { featureRequestId: synced.featureId }
+          });
+
+          return {
+            isLinked: true,
+            prd: {
+              problemStatement: synced.prd.problemStatement,
+              goals: synced.prd.goals,
+              acceptanceCriteria: synced.prd.acceptanceCriteria,
+            },
+            tasks: synced.tasks.map(t => ({
+              id: t.id,
+              title: t.title,
+              description: t.description || "",
+              status: t.status,
+            })),
+          };
+        }
+
+        // Fallback: Use existing database-only matching if .theship files are absent in the branch
         if (pullRequest.featureRequestId) {
           const feature = await prisma.featureRequest.findUnique({
             where: { id: pullRequest.featureRequestId },
@@ -178,10 +385,6 @@ export const reviewPullRequest = inngest.createFunction(
             };
           }
         }
-
-        const project = await prisma.project.findFirst({
-          where: { repoFullName: pullRequest.repoFullName },
-        });
 
         if (project) {
           const activeFeature = await prisma.featureRequest.findFirst({

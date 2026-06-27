@@ -3,10 +3,14 @@ import { prisma } from "@/lib/db";
 
 // Helper to generate a slug from text
 export function getSlug(title: string): string {
-  return title
+  const baseSlug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
+  if (baseSlug.length > 50) {
+    return baseSlug.slice(0, 50).replace(/-$/, "");
+  }
+  return baseSlug;
 }
 
 // Fetch GitHub installation ID for a project

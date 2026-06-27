@@ -75,12 +75,14 @@ Divide the findings into two clear sections:
 ### 📋 PRD Compliance & Requirements
 (Only list items here if a PRD is provided. If no PRD is provided, write "No PRD context linked to this Pull Request." If a PRD is provided but the PR is not linked to it, evaluate the implementation of any targeted features, or state: "This Pull Request is not linked to a specific feature request. Implemented changes are unrelated to the active PRD goals.")
 
-For each finding in this section, use this format:
+For each finding in this section, you MUST format the details using these specific bullets to explain the gap:
 #### [SEVERITY] Short Title
 (SEVERITY must be exactly either [BLOCKING] or [NON-BLOCKING])
 * **Confidence:** High | Medium | Low
 * **Location:** Relevant file/function/context
-* **Problem:** Explain which PRD criteria or task is missing or failed.
+* **PRD Promise:** Explain what specific requirement, goal, or acceptance criteria was promised/specified in the PRD.
+* **Actual Change:** Explain what was actually implemented (or missing) in the code changes.
+* **Discrepancy Reason:** Explain clearly why this difference is not accepted or doesn't meet the PRD goals.
 * **Impact:** Explain why it matters.
 * **Recommended Fix:** Explain how to fix it.
 * **Example Patch:** Provide code example if helpful.

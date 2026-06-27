@@ -153,8 +153,7 @@ export const reviewPullRequest = inngest.createFunction(
           const feature = await prisma.featureRequest.findUnique({
             where: { id: pullRequest.featureRequestId },
             include: {
-              prd: true,
-              project: {
+              prd: {
                 include: {
                   tasks: true
                 }
@@ -170,7 +169,7 @@ export const reviewPullRequest = inngest.createFunction(
                 goals: feature.prd.goals,
                 acceptanceCriteria: feature.prd.acceptanceCriteria,
               },
-              tasks: feature.project.tasks.map(t => ({
+              tasks: feature.prd.tasks.map(t => ({
                 id: t.id,
                 title: t.title,
                 description: t.description,
@@ -191,24 +190,30 @@ export const reviewPullRequest = inngest.createFunction(
               status: { in: ["development", "planning", "prd_generation", "ready_for_review"] },
             },
             include: {
-              prd: true,
+              prd: {
+                include: {
+                  tasks: true
+                }
+              },
             },
             orderBy: { updatedAt: "desc" },
           });
 
           if (activeFeature && activeFeature.prd) {
-            const tasks = await prisma.task.findMany({
-              where: { projectId: project.id },
+            // Persist the link to the database
+            await prisma.pullRequest.update({
+              where: { id: pullRequestId },
+              data: { featureRequestId: activeFeature.id }
             });
 
             return {
-              isLinked: false,
+              isLinked: true,
               prd: {
                 problemStatement: activeFeature.prd.problemStatement,
                 goals: activeFeature.prd.goals,
                 acceptanceCriteria: activeFeature.prd.acceptanceCriteria,
               },
-              tasks: tasks.map(t => ({
+              tasks: activeFeature.prd.tasks.map(t => ({
                 id: t.id,
                 title: t.title,
                 description: t.description,

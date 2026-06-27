@@ -160,8 +160,13 @@ ${codebaseSnippets.join("\n\n")}`;
     }
 
     const firstQuestion = await step.run("generate-first-question", async () => {
-      const systemPrompt = `You are an expert Product Manager. A user has submitted a feature request that is not yet in the codebase. Ask the first, highly targeted question to clarify missing requirements and details. Keep it conversational and friendly.
-Ask for exactly 1-2 major clarifications only (e.g. key user options, integration targets).`;
+      const systemPrompt = `You are an expert Product Manager. A user has submitted a feature request that is not yet in the codebase.
+Your goal is to ask a highly targeted opening question that sets a deep technical, structured tone.
+Rather than asking basic high-level questions, ask about:
+1. Specific design constraints, API endpoint paths (e.g., /health vs /healthz), or interface choices.
+2. Required database integrations, schemas, or key data fields.
+3. Edge cases you foresee (e.g. database down, validation rules, error handling strategies).
+Make sure to keep it conversational, friendly, and structured.`;
 
       const userPrompt = `Feature Request: ${featureRequest.title}
 Description: ${featureRequest.description}`;
@@ -213,6 +218,11 @@ export const onFeatureChatReceivedFunction = inngest.createFunction(
 
     const checkResult = await step.run("check-requirements-sufficiency", async () => {
       const systemPrompt = `You are a Senior Product Manager. Your task is to analyze a feature request and the requirements discussion history, and decide if you have enough clear, detailed information to compile a structured Product Requirements Document (PRD).
+* THOROUGHNESS RULE: Do not declare requirements sufficient too quickly. You should aim to ask clarifying questions about edge cases, error handling, exact routes/API paths, data schemas, security expectations, configuration variables, and fallback behaviors.
+* If the feature involves servers, APIs, or database interactions, you MUST ensure you clarify:
+  - The exact endpoints (e.g., "/health" vs "/healthz"), HTTP methods, query parameters, and JSON response structures.
+  - Edge cases (e.g., what happens if the database is unreachable, what are the validation rules for inputs, how should rate limiting or CORS be handled).
+  - Clarify environment variables, logging levels, and testing expectations.
 * CRITICAL RULE: If the user explicitly chose to skip the entire chat, requests to proceed, or requests to compile the PRD now (e.g. text starts with "[Skip Question]" or "[Compile PRD Now]"), you MUST set "sufficient" to true immediately. Do not ask another question.
 * CRITICAL RULE: If the user chose to skip a single question (e.g. text starts with "[Skip Single Question]"), do NOT mark requirements as sufficient immediately unless you have everything else you need. Instead:
   1. Respect the user's decision to skip that specific question (e.g., they don't want to provide sensitive credentials, API keys, or specific details).

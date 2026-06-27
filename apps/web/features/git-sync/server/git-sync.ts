@@ -261,6 +261,23 @@ Before starting work:
     content: tasksJsonContent
   });
 
+  // 3b. Fetch latest review if exists
+  const latestPr = await prisma.pullRequest.findFirst({
+    where: {
+      featureRequestId: featureId,
+      status: { in: ["reviewed", "fix_needed"] },
+      reviewComment: { not: null }
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+
+  if (latestPr && latestPr.reviewComment) {
+    files.push({
+      path: `.theship/features/${slug}/review.md`,
+      content: latestPr.reviewComment
+    });
+  }
+
   // 4. Individual Task files named by title slug
   feature.prd.tasks.forEach((task, index) => {
     const taskSlug = getSlug(task.title);
@@ -275,13 +292,13 @@ Before starting work:
     });
   });
 
-  // 5. Cleanup deleted subtasks on GitHub using path sets
+  // 5. Cleanup deleted subtasks and stale files on GitHub using path sets
   try {
     const app = getGithubApp();
     const octokit = await app.getInstallationOctokit(installationId);
     
-    // Get the current tasks folder tree to find files that should be deleted
-    const tasksPath = `.theship/features/${slug}/tasks`;
+    // Get the current feature folder tree to find files that should be deleted
+    const featurePath = `.theship/features/${slug}`;
     const { data: treeData } = await octokit.request(
       "GET /repos/{owner}/{repo}/git/trees/{tree_sha}",
       { owner, repo, tree_sha: branch, recursive: "1" }
@@ -290,9 +307,9 @@ Before starting work:
     const activePaths = new Set(files.map(f => f.path));
     
     treeData.tree.forEach(entry => {
-      if (entry.path && entry.path.startsWith(tasksPath) && entry.type === "blob") {
+      if (entry.path && entry.path.startsWith(featurePath) && entry.type === "blob") {
         if (!activePaths.has(entry.path)) {
-          // This task file is no longer in our active list, delete it from GitHub!
+          // This file is no longer in our active list, delete it from GitHub!
           files.push({
             path: entry.path,
             content: null // marks for deletion
@@ -302,7 +319,7 @@ Before starting work:
     });
   } catch (err) {
     // If the folder/tree doesn't exist yet, we just ignore the error
-    console.log("[syncFeatureToGit] No existing tasks folder found to clean up.");
+    console.log("[syncFeatureToGit] No existing feature folder found to clean up.");
   }
 
   // 6. Commit all changes

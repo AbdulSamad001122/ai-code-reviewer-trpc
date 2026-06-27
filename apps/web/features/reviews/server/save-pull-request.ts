@@ -196,12 +196,22 @@ export async function savePullRequest(payload: PullRequestWebhookPayload) {
   const prTitle = payload.pull_request.title;
   const prBody = payload.pull_request.body;
 
-  const featureRequestId = await findMatchingFeatureRequest(
-    repoFullName,
-    branchName,
-    prTitle,
-    prBody
-  );
+  const existingPr = await prisma.pullRequest.findUnique({
+    where: {
+      repoFullName_prNumber: { repoFullName, prNumber }
+    },
+    select: { featureRequestId: true }
+  });
+
+  let featureRequestId = existingPr?.featureRequestId || null;
+  if (!featureRequestId) {
+    featureRequestId = await findMatchingFeatureRequest(
+      repoFullName,
+      branchName,
+      prTitle,
+      prBody
+    );
+  }
 
   return prisma.pullRequest.upsert({
     where: {
@@ -216,13 +226,13 @@ export async function savePullRequest(payload: PullRequestWebhookPayload) {
       headSha: payload.pull_request.head.sha,
       baseBranch: payload.pull_request.base.ref,
       status: "pending",
-      featureRequestId: featureRequestId ?? null,
+      featureRequestId,
     },
     update: {
       title: prTitle,
       headSha: payload.pull_request.head.sha,
       status: "pending",
-      featureRequestId: featureRequestId ?? null,
+      featureRequestId,
     }
   });
 }

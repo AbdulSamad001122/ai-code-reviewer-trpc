@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -237,9 +238,13 @@ export default function LandingPage() {
       <header className="relative z-20 w-full px-6 lg:px-10 xl:px-16">
         <nav className="relative mx-auto flex h-20 max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-[#D7FFA4] text-[#0F2124] font-black text-lg shadow-[0_0_15px_rgba(215,255,164,0.3)]">
-              T
-            </div>
+            <Image
+              src="/new_logo.png"
+              alt="TheShip.ai"
+              width={40}
+              height={40}
+              className="rounded-xl shadow-[0_0_15px_rgba(215,255,164,0.3)]"
+            />
             <span className="text-xl font-extrabold tracking-tight text-white">
               TheShip<span className="text-[#D7FFA4]">.ai</span>
             </span>

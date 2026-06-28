@@ -341,8 +341,11 @@ export function AdminDashboard({
                   </tr>
                 ) : (
                   filteredUsers.map((user) => (
-                    <tr key={user.id} className="group hover:bg-white/[0.03] transition-colors">
-                      <td className="px-5 py-4">
+                    <tr
+                      key={user.id}
+                      onClick={() => window.location.href = `/admin/users/${user.id}`}
+                      className="group hover:bg-white/[0.03] transition-colors cursor-pointer"
+                    >                      <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           {user.image ? (
                             <img

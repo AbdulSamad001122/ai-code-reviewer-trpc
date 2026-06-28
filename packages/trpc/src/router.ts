@@ -6,6 +6,7 @@ import { projectRouter } from "./routers/project.js";
 import { featuresRouter } from "./routers/features.js";
 import { tasksRouter } from "./routers/tasks.js";
 import { billingRouter } from "./routers/billing.js";
+import { adminRouter } from "./routers/admin.js";
 
 export const appRouter = router({
     health: publicProcedure.query(() => {
@@ -20,6 +21,7 @@ export const appRouter = router({
     features: featuresRouter,
     tasks: tasksRouter,
     billing: billingRouter,
+    admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;
